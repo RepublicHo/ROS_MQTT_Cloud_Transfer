@@ -8,7 +8,7 @@ from paho.mqtt.client import MQTTv311
 
 class ArgsSetters(object):
 
-    DEFAULT_HOST = "localhost"
+    DEFAULT_HOST = "121.41.94.38"
 
     def __init__(self, message_type):
         self.args = {
