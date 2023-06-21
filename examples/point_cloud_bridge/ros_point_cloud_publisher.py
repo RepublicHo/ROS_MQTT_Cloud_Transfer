@@ -15,9 +15,11 @@ Procedure
 '''
 
 msg_index = 0
+num_index = 0
+sum = 0
 
 def callback(data):
-    global msg_index
+    global msg_index, num_index, sum
     # This function is called every time a new point cloud message is received
     # rospy.loginfo("Forwarder received point cloud message with %d points" % len(data.data))
     
@@ -30,13 +32,16 @@ def callback(data):
     # Flatten the list of lists into a single list of floats
     cloud_points_flat = [coord for point in cloud_points_float for coord in point]
 
+    # Save the binary message to a file with an index in the filename.
+    filename = 'cloud_pub_%d.txt' % msg_index
+    with open(filename, 'w') as f:
+        for point in cloud_points_flat:
+            sum += point
+            f.write(str(num_index) + " " + str(point) + " " + str(sum) + '\n')
+            num_index += 1
+
     # Pack the list of floats into a binary string
     binary_msg = struct.pack('<%sf' % len(cloud_points_flat), *cloud_points_flat)
-
-    # Save the binary message to a file with an index in the filename.
-    filename = 'binary_msg_%d.txt' % msg_index
-    with open(filename, 'wb') as f:
-        f.write(binary_msg)
 
     # Increment the message index.
     msg_index += 1
@@ -66,3 +71,4 @@ if __name__ == '__main__':
 
     # Spin the node to keep it running and wait for incoming messages
     rospy.spin()
+

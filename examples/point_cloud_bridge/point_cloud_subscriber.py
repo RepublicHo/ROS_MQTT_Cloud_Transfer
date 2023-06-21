@@ -16,26 +16,30 @@ Procedure
 
 # Initialize a counter variable to keep track of the file index
 file_index = 0
+num_index = 0
+sum = 0
 
 # This function is called when the client connects to the MQTT broker
 def on_connect(client, userdata, flags, rc):
     print("Connected to MQTT broker with result code " + str(rc))
     # Subscribe to the topic of interest
-    client.subscribe("ABC")
+    client.subscribe("ABC", qos=2)
 
 # This function is called when a message is received on the subscribed topic
 def on_message(client, userdata, msg):
-    global file_index
+    global file_index, num_index, sum
     print("Received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
 
     # Unpack the binary message into a list of floats
     cloud_points_flat = struct.unpack('<%sf' % (len(msg.payload) // 4), msg.payload)
 
     # Save the cloud_points_flat data to a file with an index in the filename
-    filename = 'cloud_points_%d.txt' % file_index
+    filename = 'cloud_sub_%d.txt' % file_index
     with open(filename, 'w') as f:
         for point in cloud_points_flat:
-            f.write(str(point) + '\n')
+            sum += point
+            f.write(str(num_index) + " " + str(point) + " " + str(sum) + '\n')
+            num_index += 1
 
     # Increment the file index
     file_index += 1
