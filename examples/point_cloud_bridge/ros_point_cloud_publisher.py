@@ -14,9 +14,12 @@ Procedure
 2. Publish/Subscribe
 '''
 
+msg_index = 0
+
 def callback(data):
+    global msg_index
     # This function is called every time a new point cloud message is received
-    rospy.loginfo("Forwarder received point cloud message with %d points" % len(data.data))
+    # rospy.loginfo("Forwarder received point cloud message with %d points" % len(data.data))
     
     # Convert the PointCloud2 message to a list of points. 
     cloud_points = list(point_cloud2.read_points(data, skip_nans=True, field_names = ("x", "y", "z")))
@@ -29,6 +32,16 @@ def callback(data):
 
     # Pack the list of floats into a binary string
     binary_msg = struct.pack('<%sf' % len(cloud_points_flat), *cloud_points_flat)
+
+    # Save the binary message to a file with an index in the filename.
+    filename = 'binary_msg_%d.txt' % msg_index
+    with open(filename, 'wb') as f:
+        f.write(binary_msg)
+
+    # Increment the message index.
+    msg_index += 1
+
+    rospy.loginfo("Forwarder forwards point cloud message with payload size %d " % len(binary_msg))    
 
     # Publish the binary message to MQTT topic
     publish.single("ABC", payload=binary_msg, hostname="121.41.94.38")
