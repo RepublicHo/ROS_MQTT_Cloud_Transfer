@@ -1,9 +1,11 @@
 #!/usr/bin/env python
-
+from sensor_msgs.msg import PointCloud2, PointField
+from std_msgs.msg import Header
 from time import sleep
 import paho.mqtt.client as mqtt
 from ros_mqtt_bridge import MQTTToROS
 import struct
+import rospy
 from sensor_msgs.msg import PointCloud2
 
 '''
@@ -12,22 +14,24 @@ Procedure
 2. Publish/Subscribe
 '''
 
+# This function is called when the client connects to the MQTT broker
+def on_connect(client, userdata, flags, rc):
+    print("Connected to MQTT broker with result code " + str(rc))
+    # Subscribe to the topic of interest
+    client.subscribe("ABC")
 
-def listener(client, userdata, message):
+# This function is called when a message is received on the subscribed topic
+def on_message(client, userdata, msg):
+    print("Received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
 
-    print("Received message on topic: ", message.topic)
+    # Unpack the binary message into a list of floats
+    cloud_points_flat = struct.unpack('<%sf' % (len(msg.payload) // 4), msg.payload)
 
-    # Convert the binary message to na list of points
-    cloud_points = struct.unpack("<%df" % (len(message.payload)/4), message.payload)
+    # Convert the list of floats to a list of tuples representing points
+    cloud_points = [(cloud_points_flat[i], cloud_points_flat[i+1], cloud_points_flat[i+2]) for i in range(0, len(cloud_points_flat), 3)]
 
-    # Create a PointCloud2 message
-    header = Header()
-    header.stamp = rospy.Time.now()
-    header.frame_id = "base_link"
-    fields = [PointField('x', 0, PointField.FLOAT32, 1),
-              PointField('y', 4, PointField.FLOAT32, 1),
-              PointField('z', 8, PointField.FLOAT32, 1)]
-    cloud_msg = point_cloud2.create_cloud(header, fields, cloud_points)
+    # Create a PointCloud2 message from the list of points
+    header = Header(frame_id="cloud_frame")
     
 
 
@@ -40,10 +44,10 @@ def listener(client, userdata, message):
 
 if __name__ == '__main__':
     client = mqtt.Client()
-    client.connect("121.41.94.38")
-    client.subscribe("ABC")
+    client.connect("121.41.94.38", 1883, 60)
     # Set the callback function for incoming messages
-    client.on_message = listener
+    client.on_connect = on_connect
+    client.on_message = on_message
 
     client.loop_forever()
 

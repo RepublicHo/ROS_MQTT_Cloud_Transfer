@@ -21,8 +21,14 @@ def callback(data):
     # Convert the PointCloud2 message to a list of points. 
     cloud_points = list(point_cloud2.read_points(data, skip_nans=True, field_names = ("x", "y", "z")))
 
-    # Convert the list of points to binary string
-    binary_msg = struct.pack('<%sf' % len(cloud_points), *cloud_points)
+    # Convert each tuple in the list of points to a list of floats
+    cloud_points_float = [[float(i) for i in point] for point in cloud_points]
+
+    # Flatten the list of lists into a single list of floats
+    cloud_points_flat = [coord for point in cloud_points_float for coord in point]
+
+    # Pack the list of floats into a binary string
+    binary_msg = struct.pack('<%sf' % len(cloud_points_flat), *cloud_points_flat)
 
     # Publish the binary message to MQTT topic
     publish.single("ABC", payload=binary_msg, hostname="121.41.94.38")
