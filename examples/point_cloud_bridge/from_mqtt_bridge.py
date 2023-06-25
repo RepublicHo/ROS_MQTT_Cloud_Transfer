@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from examples.point_cloud_bridge.bridge import bridge
+from examples.point_cloud_bridge.bridge import Bridge
 import rospy
 
 
@@ -10,7 +10,7 @@ import rospy
 # 3. processing incoming MQTT messages.
 
 
-class FromMqttBridge(bridge.Bridge):
+class FromMqttBridge(Bridge):
     
     def msg_process(self, msg):
         """

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from examples.point_cloud_bridge.bridge import bridge
+from examples.point_cloud_bridge.bridge import Bridge
 import rospy
 import struct
 import paho.mqtt.publish as publish
@@ -19,7 +19,7 @@ msg_index = 0
 num_index = 0
 sum = 0
 
-class ToMqttBridge(bridge.Bridge):
+class ToMqttBridge(Bridge):
 
     def __init__(self, mqtt_topic, client_id = "test_mqtt_client", 
                  user_id="", password="", 

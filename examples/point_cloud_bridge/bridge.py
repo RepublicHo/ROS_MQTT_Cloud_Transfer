@@ -2,7 +2,7 @@
 import paho.mqtt.client as mqtt
 import time
 
-class bridge:
+class Bridge:
     def __init__(self, mqtt_topic, client_id="bridge", user_id="", password="", 
                  host="localhost", port="1883", keepalive=60, qos=0):
         """
