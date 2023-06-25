@@ -72,7 +72,7 @@ class Bridge:
         """
         Callback function called when the client successfully connects to the broker
         """
-        print(f"Connected with result code {str(rc)}")
+        print(f"Connected to MQTT broker with result code {str(rc)}")
         self.client.subscribe(self.mqtt_topic)
         self.timeout = 0
 
