@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from time import sleep
+from typing_extensions import deprecated
 
 from ros_mqtt_bridge import ROSToMQTT
 import struct
@@ -18,6 +19,7 @@ msg_index = 0
 num_index = 0
 sum = 0
 
+@deprecated
 def callback(data):
     global msg_index, num_index, sum
     # This function is called every time a new point cloud message is received
@@ -49,7 +51,7 @@ def callback(data):
     rospy.loginfo("Forwarder forwards point cloud message with payload size %d " % len(binary_msg))    
 
     # Publish the binary message to MQTT topic
-    publish.single("ABC", payload=binary_msg, hostname="121.41.94.38")
+    publish.single("ABC", payload=binary_msg, hostname="121.41.94.38", qos=2)
     
 # def launch_ros_to_mqtt_bridge():
 #     # create ROSToMQTT instance with specific topics and message types

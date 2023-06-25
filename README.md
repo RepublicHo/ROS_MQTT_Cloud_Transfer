@@ -43,4 +43,4 @@ $ mosquitto_pub -d -t /mqtt/test/std_msgs_string -m '{"data": "test text from mq
 ```
 
 
-现在不明白 
+![Alt text](image.png)

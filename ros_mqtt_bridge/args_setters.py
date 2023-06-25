@@ -7,7 +7,11 @@ from paho.mqtt.client import MQTTv311
 
 
 class ArgsSetters(object):
+    """
+    A class that provides methods for setting arguments for ROS and MQTT components.
+    """
 
+    # TODO: Modify host as per your cloud host. 
     DEFAULT_HOST = "121.41.94.38"
 
     def __init__(self, message_type):

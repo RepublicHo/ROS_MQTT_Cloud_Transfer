@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from typing_extensions import deprecated
 from sensor_msgs.msg import PointCloud2, PointField
 from std_msgs.msg import Header
 from time import sleep
@@ -19,12 +20,14 @@ file_index = 0
 num_index = 0
 sum = 0
 
+# @deprecated
 # This function is called when the client connects to the MQTT broker
 def on_connect(client, userdata, flags, rc):
     print("Connected to MQTT broker with result code " + str(rc))
     # Subscribe to the topic of interest
     client.subscribe("ABC", qos=2)
 
+# @deprecated
 # This function is called when a message is received on the subscribed topic
 def on_message(client, userdata, msg):
     global file_index, num_index, sum
