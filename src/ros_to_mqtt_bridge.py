@@ -21,7 +21,7 @@ sum = 0
 
 class ToMqttBridge(Bridge):
 
-    def __init__(self, mqtt_topic, client_id = "test_mqtt_client", 
+    def __init__(self, mqtt_topic, client_id = "forwarder", 
                  user_id="", password="", 
                  host="localhost", port="1883", keepalive=60, qos=0):
         """
@@ -88,6 +88,8 @@ def main():
 
     # Start the MQTT client's event loop
     bridge.looping()
+    
+    rospy.spin()
 
 
 if __name__ == '__main__':

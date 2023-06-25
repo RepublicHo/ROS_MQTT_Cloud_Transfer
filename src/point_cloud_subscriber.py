@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from typing_extensions import deprecated
+
 from sensor_msgs.msg import PointCloud2, PointField
 from std_msgs.msg import Header
 from time import sleep
