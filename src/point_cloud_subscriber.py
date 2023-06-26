@@ -6,8 +6,8 @@ from time import sleep
 import paho.mqtt.client as mqtt
 from ros_mqtt_bridge import MQTTToROS
 import struct
-import rospy
-from sensor_msgs.msg import PointCloud2
+import open3d as o3d
+
 
 '''
 Procedure
@@ -36,6 +36,16 @@ def on_message(client, userdata, msg):
     # Unpack the binary message into a list of floats
     cloud_points_flat = struct.unpack('<%sf' % (len(msg.payload) // 4), msg.payload)
 
+    # Convert the list of floats to a list of tuples representing points
+    cloud_points = [(cloud_points_flat[i], cloud_points_flat[i+1], cloud_points_flat[i+2]) for i in range(0, len(cloud_points_flat), 3)]
+
+    # Create a PointCloud object from the list of points
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(cloud_points)
+
+    # Visualize point cloud
+    o3d.visualization.draw_geometries([pcd])
+    
     # Save the cloud_points_flat data to a file with an index in the filename
     filename = 'cloud_sub_%d.txt' % file_index
     with open(filename, 'w') as f:
