@@ -84,7 +84,7 @@ def main():
     bridge = ToMqttBridge(mqtt_topic="ABC", host="121.41.94.38", port=1883, qos=2)
 
     # Subscribe to the point cloud input topic and set the callback function
-    rospy.Subscriber('/ouster/points', PointCloud2, bridge.callback)
+    rospy.Subscriber('/PR_BE/point_cloud', PointCloud2, bridge.callback)
 
     # Start the MQTT client's event loop
     bridge.looping()
