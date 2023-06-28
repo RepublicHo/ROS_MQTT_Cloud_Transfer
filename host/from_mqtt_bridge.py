@@ -31,7 +31,6 @@ class FromMqttBridge(Bridge):
 
 
 
-
 def main():
     rospy.init_node("mqtt_to_ros_processor", anonymous=True)
     test_sub2 = FromMqttBridge("MQTT_Test_Topic")

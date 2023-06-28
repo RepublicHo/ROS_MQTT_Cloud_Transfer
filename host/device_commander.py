@@ -1,46 +1,48 @@
 import paho.mqtt.client as mqtt
 import base64
 import json
+import rospy
 import os
 import config as CONFIG
 import requests
+import iot_status_checker
 
 
 
 
 # Define the command to be executed on the IoT device
-command = "/execute"
+# command = "/execute"
 
-# Define the headers for the HTTP request
-headers = {
-    "Content-Type": "application/json"
-}
+# # Define the headers for the HTTP request
+# headers = {
+#     "Content-Type": "application/json"
+# }
 
-# Define the data to be sent in the HTTP request
-data = {
-    "param1": "value1",
-    "param2": "value2"
-}
+# # Define the data to be sent in the HTTP request
+# data = {
+#     "param1": "value1",
+#     "param2": "value2"
+# }
 
-# Execute the command on the IoT device from the local machine
-local_url = f"http://{CONFIG.DEVICE.IP_ADDRESS}:{CONFIG.DEVICE.HTTP_PORT}{command}"
-response = requests.post(local_url, headers=headers, json=data)
-print(response.content)
+# # Execute the command on the IoT device from the local machine
+# local_url = f"http://{CONFIG.DEVICE.IP_ADDRESS}:{CONFIG.DEVICE.HTTP_PORT}{command}"
+# response = requests.post(local_url, headers=headers, json=data)
+# print(response.content)
 
-# Execute the command on the IoT device from the cloud
-cloud_url = "https://example.com/api/execute"
-response = requests.post(cloud_url, headers=headers, json=data)
-print(response.content)
+# # Execute the command on the IoT device from the cloud
+# cloud_url = "https://example.com/api/execute"
+# response = requests.post(cloud_url, headers=headers, json=data)
+# print(response.content)
 
-# Forward the command to the IoT device
-device_url = f"http://{iot_device_ip}:{iot_device_port}/command"
-response = requests.post(device_url, headers=headers, json={
-    "command": command,
-    "data": data
-})
-print(response.content)
+# # Forward the command to the IoT device
+# device_url = f"http://{iot_device_ip}:{iot_device_port}/command"
+# response = requests.post(device_url, headers=headers, json={
+#     "command": command,
+#     "data": data
+# })
+# print(response.content)
 
-vibot = # 怎么建立连接?
+# vibot = # 怎么建立连接?
 
 # Set up the MQTT client
 client = mqtt.Client()
@@ -49,19 +51,17 @@ client = mqtt.Client()
 def check_device_power_status():
     
     # TODO: Demo code here, to modify later. 
-    
-    # 1. subscribe to the device's status topic, listening for 20s for example. 
-    
+    # 1. subscribe to the device's status topic, listening for 20s for example.  
     # 2. Once the localhost subscribed to the status topic, it sends commands to verify connectivity. This
     
-    # 3. 
-    if vibot.power == "ON":
-        menu()
-    if vibot.power == "OFF":
+    vibot_status = iot_status_checker.check_device_status
+    if vibot_status:
+        print("::: Device is OFF")
+    else:
         print("::: Device is OFF")
     
-    # Publish the check status command to the device topic
-    send_command("check_device_status")
+    # # Publish the check status command to the device topic
+    # send_command("check_device_status")
 
 # Define the function to check if the capturing service is on, and open it if necessary
 def check_capturing_service():
@@ -101,7 +101,7 @@ def on_message(client, userdata, message):
 # Define the function to send commands to the device
 def send_command(command):
     # Publish the command to the device topic
-    client.publish(topic_prefix + "/command", command)
+    client.publish( "/command", command)
 
 
 # Define the function to capture data
@@ -153,10 +153,10 @@ def adjust_settings(setting_name, setting_value):
     setting_json = json.dumps(setting_dict)
 
     # Publish the setting change command to the device topic
-    try:
-        client.publish(topic_prefix + "/settings", setting_json)
-    except Exception as e:
-        print("Error adjusting settings: {}".format(e))
+    # try:
+    #     client.publish(topic_prefix + "/settings", setting_json)
+    # except Exception as e:
+    #     print("Error adjusting settings: {}".format(e))
 
 # define clear
 def clear():
@@ -182,8 +182,8 @@ def menu():
     )
 
     print("::: INFO :::")
-    print("::: POWER: " + denon.power)
-    print("::: NAME: " + denon.name)
+    # print("::: POWER: " + denon.power)
+    # print("::: NAME: " + denon.name)
     
     
     # Define the topic to subscribe/publish to
@@ -225,24 +225,24 @@ def menu():
     command = input("::: Select point from menu: ")
 
     # Send the appropriate command to the device
-    if command in ['1']:
-        clear()
-        start_data_transfer()
-    elif command in ['2']:
-        capture_data()
-    elif command in ['3']:
-        check_device_status()
-    elif command in ['4']:
-        check_capturing_service()
-    elif command in ['5']:
-        others()
-    elif command in ['9']:
-        exit(code="Exiting...")
-    else:
-        print("Please select point from menu.")
-        time.sleep(2)
-        clear()
-        menu()
+    # if command in ['1']:
+    #     clear()
+    #     start_data_transfer()
+    # elif command in ['2']:
+    #     capture_data()
+    # elif command in ['3']:
+    #     check_device_status()
+    # elif command in ['4']:
+    #     check_capturing_service()
+    # elif command in ['5']:
+    #     others()
+    # elif command in ['9']:
+    #     exit(code="Exiting...")
+    # else:
+    #     print("Please select point from menu.")
+    #     time.sleep(2)
+    #     clear()
+    #     menu()
        
         
 
@@ -253,7 +253,7 @@ def menu():
     
 if __name__ == '__main__':
     try:
-        main()
+        check_device_power_status()
     except rospy.ROSInterruptException:
         """
         If ROS interrupt exception is raised (e.g., if the user
