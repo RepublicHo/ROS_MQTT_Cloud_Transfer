@@ -29,7 +29,7 @@ def check_device_status(timeout=30):
     client = mqtt.Client()
     client.on_connect = on_connect
     client.on_message = on_message
-    client.connect("localhost", 1883, 60)
+    client.connect(CONFIG.CONNECTION.BROKER, CONFIG.CONNECTION.PORT, 60)
 
     # Start MQTT client loop
     client.loop_start()
@@ -64,7 +64,7 @@ def get_device_status(timeout=30):
     client = mqtt.Client()
     client.on_connect = on_connect
     client.on_message = on_message
-    client.connect("localhost", 1883, 60)
+    client.connect(CONFIG.CONNECTION.BROKER, CONFIG.CONNECTION.PORT, 60)
 
     # Start MQTT client loop
     client.loop_start()
@@ -91,7 +91,7 @@ def get_device_status(timeout=30):
         client = mqtt.Client()
         client.on_connect = on_connect
         client.on_message = on_message
-        client.connect("localhost", 1883, 60)
+        client.connect(CONFIG.CONNECTION.BROKER, CONFIG.CONNECTION.PORT, 60)
 
         # Start MQTT client loop
         client.loop_start()
