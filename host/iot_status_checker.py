@@ -19,7 +19,7 @@ def on_command_response(client, userdata, msg):
     userdata['command_response_received'] = True
 
 # Define function to check device status and connectivity
-def check_device_status(client, userdata, timeout=30):
+def check_device_status(client, userdata, timeout=20):
     # Start MQTT client loop
     client.loop_start()
 
@@ -39,7 +39,7 @@ def check_device_status(client, userdata, timeout=30):
         return False
 
 # Define function to get device status and return verification status
-def get_device_status(timeout=30):
+def get_device_status(timeout=20):
     # Create MQTT client instance with userdata dictionary initialized
     userdata = {'status_received': False, 'command_response_received': False}
     client = mqtt.Client(userdata=userdata)
@@ -86,3 +86,7 @@ def get_device_status(timeout=30):
     else:
         client.disconnect()
         return False
+  
+# test code  
+# if __name__ == '__main__':
+#     print(get_device_status())

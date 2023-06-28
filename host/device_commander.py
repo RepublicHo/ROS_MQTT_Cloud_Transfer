@@ -5,7 +5,7 @@ import rospy
 import os
 import config as CONFIG
 import requests
-import iot_status_checker
+import iot_status_checker as status_checker
 
 
 
@@ -54,8 +54,7 @@ def check_device_power_status():
     # 1. subscribe to the device's status topic, listening for 20s for example.  
     # 2. Once the localhost subscribed to the status topic, it sends commands to verify connectivity. This
     
-    vibot_status = iot_status_checker.get_device_status
-    if vibot_status:
+    if status_checker.get_device_status():
         print("::: Device is ON")
     else:
         print("::: Device is OFF")
