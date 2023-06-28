@@ -52,6 +52,8 @@ class Bridge:
             except:
                 # If the connection fails, wait for 2 seconds before trying again
                 print("Connection failed")
+                print("Kindly note that please have mosquitto properly installed and configured. \n From Mosquitto 2 and higher its only possible to login with localhost on that device. "
+                      +"\nFor another device you have to change some settings in mosquitto.conf. ")
             time.sleep(2)
             self.timeout += 2
 

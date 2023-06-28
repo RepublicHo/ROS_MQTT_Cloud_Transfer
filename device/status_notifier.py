@@ -2,6 +2,7 @@ import paho.mqtt.client as mqtt
 import config as CONFIG
 import time
 
+# please make it like a daemon process
 # Define MQTT client callback functions
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code "+str(rc))
@@ -15,6 +16,7 @@ def on_message(client, userdata, msg):
     if msg.payload.decode() == "status_check":
         for i in range(10):
             client.publish("iot_device/command_response", "status_ok")
+            print("sent to iot_device/command_response")
             time.sleep(1)
 
 if __name__ == "__main__":
