@@ -61,21 +61,18 @@ class Bridge:
         """
         pass
 
-    def looping(self, loop_timeout):
+    def looping(self, loop_timeout=60):
         """
         Start the MQTT client's event loop
         :param loop_timeout: The maximum time to wait for incoming messages before returning
         """
-        if loop_timeout is None:
-            self.client.loop_forever()
-        else:
-            self.client.loop(loop_timeout)
+        self.client.loop(loop_timeout)
 
     def on_connect(self, client, userdata, flags, rc):
         """
         Callback function called when the client successfully connects to the broker
         """
-        print(f"Connected with result code {str(rc)}")
+        print(f"Connected to MQTT broker with result code {str(rc)}")
         self.client.subscribe(self.mqtt_topic)
         self.timeout = 0
 

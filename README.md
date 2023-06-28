@@ -44,3 +44,9 @@ $ mosquitto_pub -d -t /mqtt/test/std_msgs_string -m '{"data": "test text from mq
 
 
 ![Alt text](image.png)
+
+TODO: 
+
+1. When the IoT device is booted, it should automatically run a program listening on (subscribing to) the specified broker. (ask gpt: how to make a Linux IoT device run a program automatically when it boots)
+
+2. 

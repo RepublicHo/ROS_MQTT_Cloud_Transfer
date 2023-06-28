@@ -3,14 +3,10 @@ import base64
 import json
 import os
 import config as CONFIG
-
-
-
 import requests
 
-# Define the IP address and port of the IoT device
-iot_device_ip = "192.168.1.100"
-iot_device_port = "8080"
+
+
 
 # Define the command to be executed on the IoT device
 command = "/execute"
@@ -27,7 +23,7 @@ data = {
 }
 
 # Execute the command on the IoT device from the local machine
-local_url = f"http://{iot_device_ip}:{iot_device_port}{command}"
+local_url = f"http://{CONFIG.DEVICE.IP_ADDRESS}:{CONFIG.DEVICE.HTTP_PORT}{command}"
 response = requests.post(local_url, headers=headers, json=data)
 print(response.content)
 
@@ -54,6 +50,11 @@ def check_device_power_status():
     
     # TODO: Demo code here, to modify later. 
     
+    # 1. subscribe to the device's status topic, listening for 20s for example. 
+    
+    # 2. Once the localhost subscribed to the status topic, it sends commands to verify connectivity. This
+    
+    # 3. 
     if vibot.power == "ON":
         menu()
     if vibot.power == "OFF":
