@@ -34,6 +34,7 @@ def check_device_status(client, userdata, timeout=20):
 
     # Return boolean value indicating device verification status
     if userdata['status_received'] and userdata['command_response_received']:
+        print("host received data on iot_device/command_response")
         return True
     else:
         return False
@@ -60,6 +61,7 @@ def get_device_status(timeout=20):
 
     # If a status update was received, check device status and return verification status
     if userdata['status_received']:
+        print("host received data on iot_device/status")
         # Subscribe to the device's command response topic and set on_command_response callback function
         client.subscribe("iot_device/command_response")
         client.message_callback_add("iot_device/command_response", on_command_response)
