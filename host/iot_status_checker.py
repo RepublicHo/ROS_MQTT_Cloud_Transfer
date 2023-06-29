@@ -76,21 +76,24 @@ class StatusChecker:
         self.client.message_callback_add("iot_device/command_response", self.on_message)
 
         # Wait for status update and send command to device
-        time_wait = time.time() + 5   # Loop for 5 seconds
+        time_wait = time.time() + timeout   # Loop for 5 seconds
         while time.time() < time_wait:
             self.client.loop()
             if self.dict['status_received']:
+                print("status_received")
                 break
-        print("abcabcabc")
-        self.send_command()
         
-        
-        # Wait for command response and check device status
-        verification_status = self.check_device_status(timeout)
+        if self.dict['status_received']:
+            self.send_command()
+            
+            # Wait for command response and check device status
+            verification_status = self.check_device_status(timeout)
 
-        # Disconnect from MQTT broker and return device verification status
-        self.disconnect()
-        return verification_status
+            # Disconnect from MQTT broker and return device verification status
+            self.disconnect()
+            return verification_status
+        else:
+            return False
 
 
 # Test code

@@ -1,9 +1,7 @@
 import paho.mqtt.client as mqtt
-import config as CONFIG
-import subprocess
 import time
-import daemon_mqtt as dm
-import threading
+
+
 
 # please make it like a daemon process
 # Define MQTT client callback functions
@@ -42,9 +40,8 @@ if __name__ == "__main__":
     client.on_message = on_message
     
     # Connect to MQTT broker and start client loop
-    client.connect(CONFIG.CONNECTION.BROKER, CONFIG.CONNECTION.PORT, 60)
+    client.connect("43.133.159.102" , 1883, 60)
     
-
     # Continuously publish device status every 5 seconds
 
     # Stop MQTT client loop and disconnect from broker
