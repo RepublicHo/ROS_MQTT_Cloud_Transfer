@@ -2,106 +2,93 @@ import paho.mqtt.client as mqtt
 import time
 import config as CONFIG
 
-# Define MQTT client callback functions
-def on_connect(client, userdata, flags, rc):
-    print("Connected with result code " + str(rc))
-    # Subscribe to the device's status topic    
-    client.subscribe("iot_device/status")
-    client.subscribe("iot_device/command_response")
+# Define a class to manage the MQTT client and callbacks
+class StatusChecker:
+    def __init__(self):
+        self.client = mqtt.Client()
+        self.dict = {'status_received': False, 'command_response_received': False}
+        self.connected = False
 
-def on_message(client, userdata, msg):
-    print("Received message: " + str(msg.payload.decode()))
-    # Verify connectivity by sending a command to the device
-    client.publish("iot_device/command", "status_check")
+        # Set up MQTT client callbacks
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
 
-def on_command_response(client, msg):
-    
-    print("Received command response: " + str(msg.payload.decode()))
-    # Set flag indicating that the device is responding to commands
-    dict['command_response_received'] = True
+    def on_connect(self, client, userdata, flags, rc):
+        print(f"Connected to MQTT broker with result code {rc}")
+        if rc == 0:
+            self.connected = True
+            # Subscribe to the device's status topic    
+            client.subscribe("iot_device/status")
+            client.subscribe("iot_device/command_response")
+        else:
+            self.connected = False
 
-def on_status_received(client, userdata, msg):
-    
-    print("Received status update: " + str(msg.payload.decode()))
-    # Set flag indicating that a status update has been received
-    dict['status_received'] = True
+    def on_message(self, client, userdata, msg):
+        print(f"Received message on topic {msg.topic}: {msg.payload.decode()}")
+        if msg.topic == "iot_device/status":
+            # Set flag indicating that a status update has been received
+            self.dict['status_received'] = True
+            print("status received here")
+        elif msg.topic == "iot_device/command_response":
+            # Set flag indicating that the device is responding to commands
+            self.dict['command_response_received'] = True
+            print("response received here")
 
-# Define function to check device status and connectivity
-def check_device_status(client, timeout=20.0):
-    global dict
-    # Start MQTT client loop
-    client.loop_start()
+    def connect(self):
+        # Connect to MQTT broker and start client loop
+        self.client.connect(CONFIG.CONNECTION.BROKER, CONFIG.CONNECTION.PORT, 60)
+        self.client.loop_start()
 
-    # Stop MQTT client loop and disconnect from broker
-    client.loop_stop()
-    client.disconnect()
+        # Wait for connection to be established
+        while not self.connected:
+            time.sleep(1)
 
-    # Return boolean value indicating device verification status
-    if dict['status_received'] and dict['command_response_received']:
-        print("host received data on iot_device/command_response")
-        return True
-    else:
-        return False
+    def disconnect(self):
+        # Stop client loop and disconnect from MQTT broker
+        self.client.loop_stop()
+        self.client.disconnect()
 
-# Define function to get device status and return verification status
-def get_device_status(timeout=20):
-    # Create MQTT client instance with global dict dictionary
-    global dict
-    dict = {'status_received': False, 'command_response_received': False}
-    client = mqtt.Client()
-    client.on_connect = on_connect
-    client.on_message = on_message
-    client.connect(CONFIG.CONNECTION.BROKER, CONFIG.CONNECTION.PORT, 60)
-    
-    client.message_callback_add("iot_device/status", on_status_received)
-    
-    print("hello")
-    time_wait = time.time() + 5   # Loop for 5 seconds
-    while time.time() < time_wait:
-        client.loop()
-    
-    # Wait for timeout seconds or until a status update is received
-    start_time = time.time()
-    print(4)
-    while (time.time() - start_time) < timeout:
-        if dict['status_received']:
-            break
-        time.sleep(1)
-    print(5)
-    # If a status update was received, check device status and return verification status
-    if dict['status_received']:
-        print("host received data on iot_device/status")
-        # Subscribe to the device's command response topic and set on_command_response callback function
-        client.subscribe("iot_device/command_response")
-        
-        print(8)
+    def send_command(self):
         # Send command to device to verify connectivity
-        client.publish("iot_device/command", "status_check")
-        print(9)
-        print(7)
-        client.message_callback_add("iot_device/command_response", on_command_response)
+        for i in range(10):
+            print("Sending command to iot_device/command")
+            self.client.publish("iot_device/command", "status_check")
+            time.sleep(1)
+
+    def check_device_status(self, timeout=20.0):
+        # Wait for timeout seconds or until a status update and command response are received
         start_time = time.time()
-        # Wait for timeout seconds for command response
-        client.message_callback_add("iot_device/status", on_status_received)
-        
         while (time.time() - start_time) < timeout:
-            if dict['command_response_received']:
+            if self.dict['status_received'] and self.dict['command_response_received']:
                 break
             time.sleep(1)
-        print(10)
-        # Call check_device_status function to return device verification status
-        verification_status = check_device_status(client, dict)
 
-        # Disconnect from broker
-        client.disconnect()
+        # Return boolean value indicating device verification status
+        return self.dict['status_received'] and self.dict['command_response_received']
 
-        # Return device verification status
+    def get_device_status(self, timeout=20.0):
+        # Connect to MQTT broker and subscribe to topics
+        self.connect()
+        self.client.message_callback_add("iot_device/status", self.on_message)
+        self.client.message_callback_add("iot_device/command_response", self.on_message)
+
+        # Wait for status update and send command to device
+        time_wait = time.time() + 5   # Loop for 5 seconds
+        while time.time() < time_wait:
+            self.client.loop()
+        
+        self.send_command()
+        
+        
+        # Wait for command response and check device status
+        verification_status = self.check_device_status(timeout)
+
+        # Disconnect from MQTT broker and return device verification status
+        self.disconnect()
         return verification_status
-    # If no status update was received, disconnect from broker and return False
-    else:
-        client.disconnect()
-        return False
 
-# test code  
+
+# Test code
 if __name__ == '__main__':
-    print(get_device_status())
+    cli = StatusChecker()
+    print(cli.get_device_status())
