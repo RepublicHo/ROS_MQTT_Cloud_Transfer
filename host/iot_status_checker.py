@@ -104,19 +104,23 @@ class StatusChecker:
 
 
 # Test code
-if __name__ == '__main__':
+def main():
     max_attempts = 3
     delay = 1
-    attempts = 0
-    while attempts < max_attempts:
+    attempt = 0
+    while attempt < max_attempts:
+        print(f"attempt {attempt}\n---")
         try:
             cli = StatusChecker()
             print(cli.get_device_status())
-            exit()
+            return
         except Exception as e:
             print() 
             print(f"Exception occurred ({str(e)}), retrying in {delay} seconds")
             time.sleep(delay)
-            attempts += 1
+            attempt += 1
             
-    print(f"number of attempts is ({attempts})")
+    print(f"number of attempts is ({attempt})")
+    
+if __name__ == "__main__":
+    main()
