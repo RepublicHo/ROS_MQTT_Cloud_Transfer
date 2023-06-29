@@ -20,19 +20,19 @@ def on_connect(client, userdata, flags, rc):
     
 
 def on_message(client, userdata, msg):
-    print("Received message: "+str(msg.payload.decode()))
+    # print("Received message: "+str(msg.payload.decode()))
     # If command is "status_check", respond with current status
     # if msg.payload.decode() == "status_check":
     print("iot device obtains the message in iot_device/command")
     # Subscribe to command topic
-    send_status_updates()
+    send_status_updates(client)
 
 def send_status_updates(client):
     # Send a series of status updates every second for 10 seconds
-    for i in range(10):
-        client.publish("iot_device/command_response", "status_ok")
-        print("sent to iot_device/command_response")
-        time.sleep(1)
+    
+    client.publish("iot_device/command_response", "status_ok")
+    print("sent to iot_device/command_response")
+    time.sleep(1)
         
 if __name__ == "__main__":
     

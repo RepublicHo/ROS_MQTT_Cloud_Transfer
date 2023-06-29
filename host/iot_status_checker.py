@@ -19,7 +19,7 @@ class StatusChecker:
             self.connected = True
             # Subscribe to the device's status topic    
             client.subscribe("iot_device/status")
-            client.subscribe("iot_device/command_response")
+            
         else:
             self.connected = False
 
@@ -29,10 +29,12 @@ class StatusChecker:
             # Set flag indicating that a status update has been received
             self.dict['status_received'] = True
             print("status received here")
+            client.publish("iot_device/command", "status_check")
+            client.subscribe("iot_device/command_response")
         elif msg.topic == "iot_device/command_response":
             # Set flag indicating that the device is responding to commands
             self.dict['command_response_received'] = True
-            print("response received here")
+            print("!!!great, response received here")
 
     def connect(self):
         # Connect to MQTT broker and start client loop
@@ -41,6 +43,7 @@ class StatusChecker:
 
         # Wait for connection to be established
         while not self.connected:
+            print("trying to reconnect to the broker :(")
             time.sleep(1)
 
     def disconnect(self):
@@ -76,7 +79,9 @@ class StatusChecker:
         time_wait = time.time() + 5   # Loop for 5 seconds
         while time.time() < time_wait:
             self.client.loop()
-        
+            if self.dict['status_received']:
+                break
+        print("abcabcabc")
         self.send_command()
         
         
