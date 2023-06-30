@@ -10,9 +10,9 @@ class APP:
 
 class CONNECTION:
     # Aliyun by Zhe
-    BROKER = "121.41.94.38"
+    BROKER = "43.133.159.102"
     PORT = 1883
-    TOPIC1 = "device/status"
+    TOPIC1 = ""
     TOPIC2 = ""
 
 class DEVICE:

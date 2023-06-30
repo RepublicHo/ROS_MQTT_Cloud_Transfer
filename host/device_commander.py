@@ -29,7 +29,7 @@ class DeviceCommander(Bridge):
         self.COMMAND_TOPIC = "command"
         self.RESPONSE_TOPIC = "command_response"
         
-        self.DATA_TOPISCS = {"cloud_point": "/data/cloud",
+        self.DATA_TOPISCS = {"point_cloud": "/data/point_cloud",
                              "image": "/data/img"}
         
         super().__init__(client_id, user_id, 

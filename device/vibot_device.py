@@ -4,7 +4,7 @@ import atexit
 import time
 
 
-class StatusNotifierBridge:
+class Vibot:
     def __init__(self, command_topic = "iot_device/command", 
                  client_id="device", user_id="", password="", 
                  host="43.133.159.102", port=1883, keepalive=60, qos=0):
@@ -18,7 +18,6 @@ class StatusNotifierBridge:
         self.keepalive = keepalive
         self.qos = qos
         
-
         self.disconnect_flag = False
         self.rc = 1
         self.timeout = 0
@@ -48,6 +47,7 @@ class StatusNotifierBridge:
             time.sleep(2)
             self.timeout += 2
 
+
     def disconnect(self):
         """
         Disconnect from the MQTT broker
@@ -63,9 +63,26 @@ class StatusNotifierBridge:
         print("processing message")
         msg = str(msg.payload.decode())
         if msg == "status_check":
-            self.publish("iot_device/command_response", "status_ok")
+            self.publish("/data/point_cloud", "point cloud sent!")
             print("sent to iot_device/command_response")
-        pass
+        
+        elif msg == "point_cloud":
+            self.publish("iot_device/command_response", "")
+            print("sent to iot_device/command_response")
+            
+        elif msg == "end_point_cloud":
+            print("End sending point cloud")
+            
+        elif msg == "image":
+            self.publish("/data/point_cloud", "image sent!")
+            print("sent to iot_device/command_response")
+            
+        elif msg == "end_image":
+            print("End sending image")
+            
+        else:
+            pass
+        
 
     def looping(self, loop_timeout=30):
         """
@@ -83,23 +100,23 @@ class StatusNotifierBridge:
         self.client.subscribe(self.command_topic)
         self.timeout = 0
         
-        # start a thread to publish status
-        status_thread = threading.Thread(target=self.publish_status)
-        status_thread.start()
-        atexit.register(self.stop_publish_status_thread, status_thread)
+        # Continuously publish device heartbeat 
+        # daemon thread is running in the background and does not prevent the
+        # main program from existing. when the main program exists, any 
+        # remaining daemon threads are terminated automatically. 
+        heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
+        heartbeat_thread.start()
     
-    def publish_status(self):
+    def send_heartbeat(self):
         """
-        Continuously publish device status every second
+        Publish device heartbeat 
         """
-        for i in range(20):
-            self.publish("iot_device/status", "connected")
-            print("daemon process publishes to iot_device/status indicating it's there")
-            time.sleep(3)
+        while True:
+            self.publish("iot_device/heartbeat", "heartbeat")
+            print("vibot: heartbeat sent")
+            time.sleep(4)
+        
             
-    def stop_publish_status_thread(self, thread):
-        print("Stopping thread")
-        thread.join()
         
     def on_disconnect(self, client, userdata, rc):
         """
@@ -159,7 +176,7 @@ class StatusNotifierBridge:
 if __name__ == "__main__":
     
     # Set up MQTT client and callbacks
-    sn = StatusNotifierBridge()
+    sn = Vibot()
     sn.looping()
     
     # Continuously publish device status every 5 seconds

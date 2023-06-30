@@ -6,7 +6,7 @@ import config as CONFIG
 class StatusChecker:
     def __init__(self):
         self.client = mqtt.Client()
-        self.dict = {'status_received': False, 'command_response_received': False}
+        self.dict = {'heartbeat': False, 'command_response_received': False}
         self.connected = False
 
         # Set up MQTT client callbacks
@@ -18,20 +18,20 @@ class StatusChecker:
         
         if rc == 0:
             self.connected = True
-            # Subscribe to the device's status topic    
-            client.subscribe("iot_device/status")
+            # Subscribe to the device's heartbeat topic    
+            client.subscribe("iot_device/heartbeat")
             print(1)
         else:
             self.connected = False
 
     def on_message(self, client, userdata, msg):
         print(f"Received message on topic {msg.topic}: {msg.payload.decode()}")
-        if msg.topic == "iot_device/status":
-            # Set flag indicating that a status update has been received
-            self.dict['status_received'] = True
-            print("status received here")
+        if msg.topic == "iot_device/heartbeat":
+            # Set flag indicating that a heartbeat has been received
+            self.dict['heartbeat'] = True
+            print(":) The heartbeat of vibot received")
             client.publish("iot_device/command", "status_check")
-            client.unsubscribe("iot_device/status")
+            client.unsubscribe("iot_device/heartbeat")
             client.subscribe("iot_device/command_response")
             print("unsubscribe ot_device/command")
         elif msg.topic == "iot_device/command_response":
@@ -67,28 +67,28 @@ class StatusChecker:
         # Wait for timeout seconds or until a status update and command response are received
         start_time = time.time()
         while (time.time() - start_time) < timeout:
-            if self.dict['status_received'] and self.dict['command_response_received']:
+            if self.dict['heartbeat'] and self.dict['command_response_received']:
                 break
             time.sleep(1)
 
         # Return boolean value indicating device verification status
-        return self.dict['status_received'] and self.dict['command_response_received']
+        return self.dict['heartbeat'] and self.dict['command_response_received']
 
     def get_device_status(self, timeout=20.0):
         # Connect to MQTT broker and subscribe to topics
         self.connect()
-        self.client.message_callback_add("iot_device/status", self.on_message)
+        self.client.message_callback_add("iot_device/heartbeat", self.on_message)
         self.client.message_callback_add("iot_device/command_response", self.on_message)
 
         # Wait for status update and send command to device
         time_wait = time.time() + timeout   # Loop for 5 seconds
         while time.time() < time_wait:
             self.client.loop()
-            if self.dict['status_received']:
-                print("status_received")
+            if self.dict['heartbeat']:
+                print("heartbeat detected")
                 break
         
-        if self.dict['status_received']:
+        if self.dict['heartbeat']:
             self.send_command()
             
             # Wait for command response and check device status
