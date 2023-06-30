@@ -1,258 +1,158 @@
 import paho.mqtt.client as mqtt
 import base64
-import json
+import struct
 import rospy
 import os
 import config as CONFIG
-import requests
 import iot_status_checker as status_checker
 
+from bridge import Bridge
 
 
-
-# Define the command to be executed on the IoT device
-# command = "/execute"
-
-# # Define the headers for the HTTP request
-# headers = {
-#     "Content-Type": "application/json"
-# }
-
-# # Define the data to be sent in the HTTP request
-# data = {
-#     "param1": "value1",
-#     "param2": "value2"
-# }
-
-# # Execute the command on the IoT device from the local machine
-# local_url = f"http://{CONFIG.DEVICE.IP_ADDRESS}:{CONFIG.DEVICE.HTTP_PORT}{command}"
-# response = requests.post(local_url, headers=headers, json=data)
-# print(response.content)
-
-# # Execute the command on the IoT device from the cloud
-# cloud_url = "https://example.com/api/execute"
-# response = requests.post(cloud_url, headers=headers, json=data)
-# print(response.content)
-
-# # Forward the command to the IoT device
-# device_url = f"http://{iot_device_ip}:{iot_device_port}/command"
-# response = requests.post(device_url, headers=headers, json={
-#     "command": command,
-#     "data": data
-# })
-# print(response.content)
-
-# vibot = # 怎么建立连接?
-
-# Set up the MQTT client
-client = mqtt.Client()
-
-# Define the function to check if the device is on
-def check_device_power_status():
+class DeviceCommander(Bridge):
     
-    # TODO: Demo code here, to modify later. 
-    # 1. subscribe to the device's status topic, listening for 20s for example.  
-    # 2. Once the localhost subscribed to the status topic, it sends commands to verify connectivity. This
-    
-    if status_checker.get_device_status():
-        print("::: Device is ON")
-    else:
-        print("::: Device is OFF")
-    
-    # # Publish the check status command to the device topic
-    # send_command("check_device_status")
-
-# Define the function to check if the capturing service is on, and open it if necessary
-def check_capturing_service():
-    # Publish the check capturing service command to the device topic
-    send_command("check_capturing_service")
-    
-# Define the function to open the capturing service
-def open_capturing_service():
-    # Publish the open capturing service command to the device topic
-    send_command("open_capturing_service")
-
-# Define the function to initiate data transfer
-def start_data_transfer():
-    # Publish the start command to the device topic
-    send_command("start_transfer")
-
-
-# Define the function to handle incoming messages
-def on_message(client, userdata, message):
-    # Decode the base64-encoded message payload
-    data = base64.b64decode(message.payload)
-
-    # Handle the data based on its type
-    if message.topic.endswith("/image"):
-        # If the message is an image, save it to disk
-        with open("image.jpg", "wb") as f:
-            f.write(data)
-    elif message.topic.endswith("/pointcloud"):
-        # If the message is a point cloud, process it
-        process_pointcloud(data)
-    elif message.topic.endswith("/data"):
-        # If the message is a data packet, parse the JSON and process the data
-        data_dict = json.loads(data)
-        process_data(data_dict)
-
-
-# Define the function to send commands to the device
-def send_command(command):
-    # Publish the command to the device topic
-    client.publish( "/command", command)
-
-
-# Define the function to capture data
-def capture_data():
-    # Publish the capture command to the device topic
-    send_command("capture_data")
-
-# Define the function to process point cloud data
-def process_pointcloud(data):
-    # Process the point cloud data
-    pass
-
-# Define the function to process data packets
-def process_data(data_dict):
-    # Extract the data type and payload from the data packet
-    data_type = data_dict.get("type")
-    data_payload = data_dict.get("payload")
-
-    # Handle the data based on its type
-    if data_type == "temperature":
-        # If the data type is temperature, print the temperature value
-        temperature = data_payload.get("value")
-        print("Temperature: {:.2f} C".format(temperature))
-    elif data_type == "humidity":
-        # If the data type is humidity, print the humidity value
-        humidity = data_payload.get("value")
-        print("Humidity: {:.2f} %".format(humidity))
-    else:
-        # If the data type is unknown, print an error message
-        print("Unknown data type: {}".format(data_type))
-
-# TODO: 很重要的处理exception
-# Define the on_disconnect() function to handle disconnection events
-# Define the on_disconnect() function to handle disconnection events
-def on_disconnect(client, userdata, rc):
-    if rc != 0:
-        print("Unexpected disconnection from MQTT broker. Retrying...")
-        try:
-            client.reconnect()
-        except Exception as e:
-            print("Error reconnecting to MQTT broker: {}".format(e))
-
-# Define the function to adjust the device's settings
-def adjust_settings(setting_name, setting_value):
-    # Create a dictionary with the setting name and value
-    setting_dict = {"name": setting_name, "value": setting_value}
-
-    # Convert the dictionary to a JSON string
-    setting_json = json.dumps(setting_dict)
-
-    # Publish the setting change command to the device topic
-    # try:
-    #     client.publish(topic_prefix + "/settings", setting_json)
-    # except Exception as e:
-    #     print("Error adjusting settings: {}".format(e))
-
-# define clear
-def clear():
-    if os.name == 'nt': 
-        # If the operating system is Windows, then the function executes the cls command 
-        # using the os.system() function to clear the terminal screen.
-        os.system('cls')
+    def __init__(self, client_id = "commander", 
+                 user_id="", password="", 
+                 host="localhost", port="1883", keepalive=60, qos=0):
+        """
+        Constructor method for the ToMqttBridge class
+        :param client_id: The ID of the client
+        :param user_id: The user ID for the broker
+        :param password: The password for the broker
+        :param host: The hostname or IP address of the broker
+        :param port: The port number of the broker
+        :param keepalive: The keepalive interval for the client
+        :param qos: The Quality of Service that determines the level of guarantee 
+        for message delivery between MQTT client and broker. 
+        """
         
-    else:
-    # If the operating system is not Windows (i.e., Mac or Linux), 
-    # then the function executes the clear command instead.
-        os.system('clear')
-
-
-def menu():
-
-    clear()
-    print(
-        '____________________________\n'
-        ':::', CONFIG.APP.APPLICATION, CONFIG.APP.VERSION, ':::\n'
-        ':::   ', CONFIG.APP.AUTHOR, '  :::\n'
-        '¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯'
-    )
-
-    print("::: INFO :::")
-    # print("::: POWER: " + denon.power)
-    # print("::: NAME: " + denon.name)
-    
-    
-    # Define the topic to subscribe/publish to
-    topic_prefix = "vibot/commander"
-    
-    # TODO: do the security part later
-    # # Set the username and password for the MQTT connection
-    # client.username_pw_set(username="myuser", password="mypassword")
-
-    # # Enable TLS encryption
-    # client.tls_set(ca_certs="ca.crt", certfile="client.crt", keyfile="client.key", tls_version=ssl.PROTOCOL_TLSv1_2)
-    # client.tls_insecure_set(False)
-
-    # # Connect to the MQTT broker
-    # client.connect("192.168.1.100", 8883)
-    
-    
-    # Set up the MQTT client callbacks
-    client.on_message = on_message
-
-    # TODO: Integrate with the class
-    # Connect to the MQTT broker
-    client.connect("localhost", 1883)
-
-    # Subscribe to the device topics
-    client.subscribe(topic_prefix + "/#")
-
-    # Start the MQTT client loop
-    client.loop_start()
-
-    print("\n::: MENU :::")
-    print("::: 1 |=> Volume Control")
-    print("::: 2 |=> Track Control")
-    print("::: 3 |=> Input Control")
-    print("::: 8 |=> Load Default Config")
-    print("::: 9 |=> Quit\n")
-    
-    # Wait for user input
-    command = input("::: Select point from menu: ")
-
-    # Send the appropriate command to the device
-    # if command in ['1']:
-    #     clear()
-    #     start_data_transfer()
-    # elif command in ['2']:
-    #     capture_data()
-    # elif command in ['3']:
-    #     check_device_status()
-    # elif command in ['4']:
-    #     check_capturing_service()
-    # elif command in ['5']:
-    #     others()
-    # elif command in ['9']:
-    #     exit(code="Exiting...")
-    # else:
-    #     print("Please select point from menu.")
-    #     time.sleep(2)
-    #     clear()
-    #     menu()
-       
+        self.COMMAND_TOPIC = "command"
+        self.RESPONSE_TOPIC = "command_response"
         
-
-    # Stop the MQTT client loop
-    client.loop_stop()
+        self.DATA_TOPISCS = {"cloud_point": "/data/cloud",
+                             "image": "/data/img"}
+        
+        super().__init__(client_id, user_id, 
+                         password, host, port, keepalive, qos)
     
+    def on_connect(self, client, userdata, flags, rc):
+        """
+        Callback function called when the client successfully connects to the broker
+        """
+        print(f"Connected to MQTT broker with result code {str(rc)}")
+        self.client.subscribe(self.RESPONSE_TOPIC)
+        self.client.subscribe(self.DATA_TOPISCS["cloud_point"])
+        self.client.subscribe(self.DATA_TOPISCS["image"])
+        self.timeout = 0
+    
+    # Define the function to handle incoming messages
+    def on_message(self, client, userdata, msg):
+        # Decode the base64-encoded message payload
+        data = base64.b64decode(msg.payload)
+        print("msg: " + msg)
+        print("data: " + data)
+        print("Commander received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
+        
+        # Handle the data based on the topic and its type
+        if msg.topic == self.DATA_TOPISCS["cloud_point"]:
+            print("->point cloud received!")
+            self.process_pointcloud(msg)
+        elif msg.topic == self.DATA_TOPISCS["image"]:
+            print("->image received!")
+            self.process_image(data)
+        else:
+            print("->Exception occurs!")
+    
+    def process_pointcloud(self, msg):
+        # Unpack the binary message into a list of floats
+        cloud_points_flat = struct.unpack('<%sf' % (len(msg.payload) // 4), msg.payload)
+
+        # Convert the list of floats to a list of tuples representing points
+        cloud_points = [(cloud_points_flat[i], cloud_points_flat[i+1], cloud_points_flat[i+2]) for i in range(0, len(cloud_points_flat), 3)]
+        print("todo...")
+    
+    def process_image(self, msg):
+        print("todo...")
+    
+    def send_commands(self):
+        return 1
+
+    def check_device_power_status(self):
+        
+        status = status_checker.get_device_status()
+        
+        if status:
+            print("::: Device is ON")
+            return 1
+        else:
+            print("::: Device is OFF, please check the device")
+            return 0
+    
+    # Define the function to check if the capturing algorithm is on
+    def check_algorithm_status(self):
+        self.publish()
+    
+    # Define the function to enable the vio capturing algorithm
+    def enable_vio_algorithm(self):
+        self.publish()
+    
+    def publish(self, topic, message, qos=0):
+        """
+        Publish a message to the MQTT broker
+        :param message: The message to publish
+        """
+        self.client.publish(topic, message, qos) 
+            
+    def callbacks(self, data):
+        return 0
+    
+    def msg_process(self, msg):
+        pass
+        
+    
+    # define clear
+    def clear(self):
+        if os.name == 'nt': 
+            # If the operating system is Windows, then the function executes the cls command 
+            # using the os.system() function to clear the terminal screen.
+            os.system('cls')
+            
+        else:
+        # If the operating system is not Windows (i.e., Mac or Linux), 
+        # then the function executes the clear command instead.
+            os.system('clear')
+    
+    def menu(self):
+
+        self.clear()
+        status = self.check_device_power_status()
+        if status == 0:
+        
+            print(
+                '____________________________\n'
+                ':::', CONFIG.APP.APPLICATION, CONFIG.APP.VERSION, ':::\n'
+                ':::   ', CONFIG.APP.AUTHOR, '  :::\n'
+                '¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯'
+            )
+            print("::: INFO :::")
+            print("Checking if the device is on, wait")
+    
+    
+    # Define the function to initiate data transfer
+    def start_data_transfer(self, data):
+        self.publish()
+
+def main():
+    rospy.init_node('device_commander', anonymous=True)
+    
+    commander_bridge = DeviceCommander(host=CONFIG.CONNECTION.BROKER, port=1883, qos=2)
+    
+    commander_bridge.menu()
 
     
 if __name__ == '__main__':
     try:
-        check_device_power_status()
+        main()
     except rospy.ROSInterruptException:
         """
         If ROS interrupt exception is raised (e.g., if the user

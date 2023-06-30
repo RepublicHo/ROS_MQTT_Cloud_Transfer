@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 from time import sleep
 from typing_extensions import deprecated
-
 import struct
 import rospy
-import 
 import paho.mqtt.publish as publish
 from sensor_msgs.msg import PointCloud
 from sensor_msgs import point_cloud2
