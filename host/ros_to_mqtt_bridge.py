@@ -4,7 +4,7 @@ from bridge import Bridge
 import rospy
 import struct
 import paho.mqtt.publish as publish
-
+import numpy as np
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs import point_cloud2
 
@@ -44,7 +44,8 @@ class ToMqttBridge(Bridge):
         global msg_index, num_index, sum
 
         # Convert the PointCloud2 message to a list of points. 
-        cloud_points = list(point_cloud2.read_points(data, skip_nans=True, field_names = ("x", "y", "z")))
+        point_array = np.array([(p.x, p.y, p.z) for p in data.points])
+        cloud_points = point_array.tolist()
 
         # Convert each tuple in the list of points to a list of floats
         cloud_points_float = [[float(i) for i in point] for point in cloud_points]

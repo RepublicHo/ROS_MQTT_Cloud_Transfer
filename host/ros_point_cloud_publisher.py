@@ -2,11 +2,11 @@
 from time import sleep
 from typing_extensions import deprecated
 
-from ros_mqtt_bridge import ROSToMQTT
 import struct
 import rospy
+import 
 import paho.mqtt.publish as publish
-from sensor_msgs.msg import PointCloud2
+from sensor_msgs.msg import PointCloud
 from sensor_msgs import point_cloud2
 
 '''
@@ -25,7 +25,8 @@ def callback(data):
     # This function is called every time a new point cloud message is received
     # rospy.loginfo("Forwarder received point cloud message with %d points" % len(data.data))
     
-    # Convert the PointCloud2 message to a list of points. 
+    # Convert the PointCloud message to a list of points.
+    
     cloud_points = list(point_cloud2.read_points(data, skip_nans=True, field_names = ("x", "y", "z")))
 
     # Convert each tuple in the list of points to a list of floats
