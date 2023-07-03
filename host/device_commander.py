@@ -1,11 +1,13 @@
 import paho.mqtt.client as mqtt
 import base64
 import struct
-import rospy
+import time
+# import rospy
 import threading
 import os
+import json
 import config as CONFIG
-import iot_status_checker as status_checker
+import iot_status_checker as isc
 
 from bridge import Bridge
 
@@ -14,7 +16,7 @@ class DeviceCommander(Bridge):
     
     def __init__(self, client_id = "commander", 
                  user_id="", password="", 
-                 host="localhost", port="1883", keepalive=60, qos=0):
+                 host="localhost", port=1883, keepalive=60, qos=0):
         """
         Constructor method for the ToMqttBridge class
         :param client_id: The ID of the client
@@ -30,59 +32,54 @@ class DeviceCommander(Bridge):
         
         self.DATA_TOPISCS = {"point_cloud": "/data/point_cloud",
                              "image": "/data/img"}
-        self.status = {'heartbeat': False, 'command_response_received': False}
+
         self.lock = threading.Lock()
+        
+        # connected is used for checking if the host can connected to the MQTT broker
         self.connected = False
+        
         self.status = 0 # 0 for not connected, 1 for connected, 2 for bug
         
-        super().__init__(client_id, user_id, 
+        # constants for brokers
+        self.COMMAND = "/iot_device/command"
+        self.COMMAND_RESPONSE = "/iot_device/command_response"
+        
+        super().__init__(self.COMMAND_RESPONSE, client_id, user_id, 
                          password, host, port, keepalive, qos)
     
-    # 每一次
     def on_connect(self, client, userdata, flags, rc):
         """
         Callback function called when the client successfully connects to the broker
         """
         print(f"Connected to MQTT broker with result code {str(rc)}")
         
-        # TODO: 这些和status checker 重合了
-        if rc == 0:
-            self.connected = True
-            self.client.subscribe(self.DEVICE_HEARTBEAT)            
-            # TODO: 这些需要的时候再subscribe也可以
-            # self.client.subscribe(self.DATA_TOPISCS["point_cloud"])
-            # self.client.subscribe(self.DATA_TOPISCS["image"])
-            self.timeout = 0
-        else:
-            self.connected = False
-    
+        # Set the connected (to MQTT broker) flag to true.
+        self.connected = True
+        # Subscribed to the command respomse topic
+        self.subscribe(self.COMMAND_RESPONSE)
  
-    
     # Define the function to handle incoming messages
     def on_message(self, client, userdata, msg):
         # Decode the base64-encoded message payload
         data = base64.b64decode(msg.payload)
         # testing code
-        print("msg: " + msg)
-        print("data: " + data)
+        # print("msg: " + msg)
+        # print("data: " + data)
         print("Commander received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
         
         with self.lock:
-            if self.status == 1:
-                if msg.topic == self.DEVICE_HEARTBEAT:
-                    # Set flag indicating that a heartbeat has been received
-                    self.status['heartbeat'] = True
-                    print(f"A received {msg.payload.decode()}")
-                    client.unsubscribe(self.DEVICE_HEARTBEAT)
-                    client.subscribe(self.RESPONSE)
-                elif msg.topic == self.RESPONSE:
-                    
-                    self.status['command_response_received'] = True
-                    print("!!!congrates, response received here")
-                    print(f"B received {msg.payload.decode()}")
-            
+            if self.status == 1 and msg.topic == self.COMMAND_RESPONSE:
+                self.msg_process(msg)
+    
+    
+    def msg_process(self, msg):
+        
+        # Decode the message payload from JSON format
+        json_payload = json.loads(msg.payload.decode())
+        print("Received message: ", json_payload)
         # Handle the data based on the topic and its type
         # if msg.topic == self.DATA_TOPISCS[""]:
+        #     pass
         #     print("->point cloud received!")
         #     self.process_pointcloud(msg)
         # elif msg.topic == self.DATA_TOPISCS["image"]:
@@ -90,12 +87,12 @@ class DeviceCommander(Bridge):
         #     self.process_image(data)
         # else:
         #     print("->Exception occurs!")
-    
-    def check_network(self):
-        while True:
-            # Check network connection
-            # Set
+      
+        
     def process_pointcloud(self, msg):
+        """
+        Function to process the point cloud data received from the IoT device
+        """
         # Unpack the binary message into a list of floats
         point_clouds_flat = struct.unpack('<%sf' % (len(msg.payload) // 4), msg.payload)
 
@@ -104,15 +101,27 @@ class DeviceCommander(Bridge):
         print("todo...")
     
     def process_image(self, msg):
-        print("todo...")
+        """
+        Function to process the image data received from the IoT device
+        """
+        pass
     
-    def send_commands(self):
-        return 1
+    def send_commands(self, value):
+        """
+        Function to send commands via MQTT to request the IoT device to transfer image/point cloud data
+        """ 
+        
+        if value == 1:
+            self.publish(self.COMMAND, "image")
+        elif value == 2:
+            self.publish(self.COMMAND, "point_cloud")
+        
 
     def check_device_power_status(self):
         
-        status = status_checker.get_device_status()
+        status_checker = isc.StatusChecker(client_id = "status_checker", host="43.133.159.102", port=1883)
         
+        status = status_checker.get_device_status()
         if status:
             print("::: Device is ON")
             return 1
@@ -140,11 +149,9 @@ class DeviceCommander(Bridge):
             
     def callbacks(self, data):
         return 0
-    
-    def msg_process(self, msg):
-        pass
+
         
-    
+
     # define clear
     def clear(self):
         if os.name == 'nt': 
@@ -160,10 +167,11 @@ class DeviceCommander(Bridge):
     def menu(self):
 
         self.clear()
-        status = self.check_device_power_status()
-        if status == 0:
+        self.status = self.check_device_power_status()
+        self.clear()
+        if self.status == 1:
             
-            network_thread = threading.Thread(self.)
+            # network_thread = threading.Thread(self.)
             print(
                 '____________________________\n'
                 ':::', CONFIG.APP.APPLICATION, CONFIG.APP.VERSION, ':::\n'
@@ -171,7 +179,37 @@ class DeviceCommander(Bridge):
                 '¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯'
             )
             print("::: INFO :::")
-            print("Checking if the device is on, wait")
+            
+            # Define the menu options
+            menu_options = [
+                {"name": "Image", "value": 1},
+                {"name": "Point Cloud", "value": 2},
+                {"name": "Exit", "value": 0},
+            ]
+            self.client.loop_start()
+            
+            time.sleep(20)
+            self.client.loop_stop()
+            #   Display the menu and prompt the user for input
+            # while True:
+            #     # Display the menu options
+            #     print("Menu:")
+            #     for option in menu_options:
+            #         print(f"{option['value']}. {option['name']}")
+                
+            #     # Prompt the user for input
+            #     choice = input("Enter your choice: ")
+                
+            #     # Handle the user's choice
+            #     if choice == "0":
+            #         print("Exiting...")
+            #         break
+            #     elif choice.isdigit() and int(choice) in [option["value"] for option in menu_options]:
+            #         chosen_option = [option for option in menu_options if option["value"] == int(choice)][0]
+            #         print(f"You chose {chosen_option['name']}.")
+                    
+            #     else:
+            #         print("Invalid choice. Please try again.")
     
     
     # Define the function to initiate data transfer
@@ -179,7 +217,7 @@ class DeviceCommander(Bridge):
         self.publish()
 
 def main():
-    rospy.init_node('device_commander', anonymous=True)
+    # rospy.init_node('device_commander', anonymous=True)
     
     commander_bridge = DeviceCommander(host=CONFIG.CONNECTION.BROKER, port=1883, qos=2)
     
@@ -187,12 +225,12 @@ def main():
 
     
 if __name__ == '__main__':
-    try:
-        main()
-    except rospy.ROSInterruptException:
-        """
-        If ROS interrupt exception is raised (e.g., if the user
-        presses Ctrl-C to stop the program), the exception is
-        caught and ignored. 
-        """
-        pass
+    # try:
+    main()
+    # except rospy.ROSInterruptException:
+    #     """
+    #     If ROS interrupt exception is raised (e.g., if the user
+    #     presses Ctrl-C to stop the program), the exception is
+    #     caught and ignored. 
+    #     """
+    #     pass

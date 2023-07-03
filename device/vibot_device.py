@@ -1,6 +1,6 @@
 import paho.mqtt.client as mqtt
 import threading
-import atexit
+import json
 import time
 
 
@@ -114,6 +114,12 @@ class Vibot:
         while True:
             self.publish("/iot_device/heartbeat", "heartbeat")
             print("vibot: heartbeat sent")
+            
+            #testing code 
+            payload = {"name": "John", "age": 30, "city": "New York"}
+            json_payload = json.dumps(payload)
+            self.publish("/iot_device/command_response", json_payload)
+            
             time.sleep(2)
         
             

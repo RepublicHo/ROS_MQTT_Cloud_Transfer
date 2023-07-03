@@ -10,8 +10,7 @@ class StatusChecker(Bridge):
                  user_id="", password="", 
                  host="localhost", port=1883, keepalive=60, qos=0): 
         
-        # connected is used for checking if the host can connected to the MQTT broker
-        self.connected = False
+        
         
         # status check is composed of heartbeat check and response check. 
         # status_code is used for checking if the host can connect to the device through
@@ -21,7 +20,7 @@ class StatusChecker(Bridge):
         self.status = {'heartbeat': False, 'response_received': False}
         self.status_code = 0 
         
-        # constants
+        # constants for brokers
         self.DEVICE_HEARTBEAT = "/iot_device/heartbeat"
         self.STATUS_CHECK = "/iot_device/status_check"
         self.STATUS_RESPONSE = "/iot_device/status_response"
@@ -32,7 +31,7 @@ class StatusChecker(Bridge):
     def on_connect(self, client, userdata, flags, rc):
         
         print(f"Connected to MQTT broker with result code {rc}")
-        self.connected = True
+        
         # Subscribe to the device's heartbeat topic    
         self.subscribe(self.DEVICE_HEARTBEAT)
 
@@ -110,7 +109,7 @@ class StatusChecker(Bridge):
 
         if self.status['heartbeat']:
             self.send_command()
-            print("Spring")
+            print("Here comes the sun!")
             # Wait for command response and check device status
             self.status_code = self.check_device_status(timeout)
 
