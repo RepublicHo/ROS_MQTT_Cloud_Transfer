@@ -3,6 +3,7 @@ import threading
 import json
 import time
 import subprocess
+import re
 
 class Vibot:
     def __init__(self, status_check_topic = "/iot_device/status_check", 
@@ -66,12 +67,15 @@ class Vibot:
             print("sent to /iot_device/status_response")
         
         elif msg == "enable_vio_service":
-            curl_command = "curl -X PUT https://httpbin.org/put -H \"Content-Type: application/json\" -d '{\"name\": \"John\", \"age\": 30}'"
+            curl_command =  "curl -X PUT http://localhost:8000/Smart/algorithmEnable"
             # Execute the curl command and capture the output
-            result = subprocess.check_output(curl_command, shell=True)
+            string1 = subprocess.check_output(curl_command, shell=True)
 
+            # Extract the JSON string using regex
+            json_string = re.search(r"b'({.*})'", string1).group(1)
             # Print the output to the console
-            print(result)
+            json_dict = json.loads(json_string)
+            self.publish("iot_device/command_response", json_dict)
             
         elif msg == "point_cloud":
             self.publish("iot_device/command_response", "")
