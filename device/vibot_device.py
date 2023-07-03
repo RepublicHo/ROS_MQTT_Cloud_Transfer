@@ -114,7 +114,7 @@ class Vibot:
         while True:
             self.publish("iot_device/heartbeat", "heartbeat")
             print("vibot: heartbeat sent")
-            time.sleep(4)
+            time.sleep(2)
         
             
         

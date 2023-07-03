@@ -1,55 +1,71 @@
 import paho.mqtt.client as mqtt
 import time
 import config as CONFIG
+from bridge import Bridge
 
-# Define a class to manage the MQTT client and callbacks
-class StatusChecker:
-    def __init__(self):
-        self.client = mqtt.Client()
-        self.dict = {'heartbeat': False, 'command_response_received': False}
+# Define a class to check the status of the IoT device
+# Once unconnected or started, try to estblish three-way handshake
+class StatusChecker(Bridge):
+    def __init__(self, client_id = "client", 
+                 user_id="", password="", 
+                 host="localhost", port="1883", keepalive=60, qos=0): 
+        
+        # connected is used for checking if the host can connected to the MQTT broker
         self.connected = False
-
-        # Set up MQTT client callbacks
-        self.client.on_connect = self.on_connect
-        self.client.on_message = self.on_message
+        
+        # status check is composed of heartbeat check and response check. 
+        # status_code is used for checking if the host can connect to the device through
+        # 1. the host can sense the heartbeat of the device. 
+        # 2. the host can verify the device, making sure it's not the malicious user. 
+        # 0 for not connected, 1 for connected, 2 for bug
+        self.status = {'heartbeat': False, 'response_received': False}
+        self.status_code = 0 
+        
+        # constants
+        self.DEVICE_HEARTBEAT = "/iot_device/heartbeat"
+        self.STATUS_CHECK = "/iot_device/status_check"
+        self.STATUS_RESPONSE = "/iot_device/status_response"
+        
+        super().__init__(client_id, user_id, 
+                         password, host, port, keepalive, qos)
 
     def on_connect(self, client, userdata, flags, rc):
-        print(f"Connected to MQTT broker with result code {rc}")
         
-        if rc == 0:
-            self.connected = True
-            # Subscribe to the device's heartbeat topic    
-            client.subscribe("iot_device/heartbeat")
-            print(1)
-        else:
-            self.connected = False
+        print(f"Connected to MQTT broker with result code {rc}")
+        self.connected = True
+        # Subscribe to the device's heartbeat topic    
+        client.subscribe(self.DEVICE_HEARTBEAT)
 
-    def on_message(self, client, userdata, msg):
+    def msg_process(self, msg):
+        
         print(f"Received message on topic {msg.topic}: {msg.payload.decode()}")
-        if msg.topic == "iot_device/heartbeat":
+        
+        if msg.topic == self.DEVICE_HEARTBEAT:
             # Set flag indicating that a heartbeat has been received
-            self.dict['heartbeat'] = True
+            self.status['heartbeat'] = True
             print(":) The heartbeat of vibot received")
-            client.publish("iot_device/command", "status_check")
-            client.unsubscribe("iot_device/heartbeat")
-            client.subscribe("iot_device/command_response")
-            print("unsubscribe ot_device/command")
-        elif msg.topic == "iot_device/command_response":
+            self.unsubscribe(self.DEVICE_HEARTBEAT)
+            self.subscribe(self.STATUS_RESPONSE)
+            # it can be replaced by passwords or others related to cryptography
+            self.publish(self.STATUS_CHECK, "status_check", 2)
+            print("unsubscribe /iot_device/heartbeat\n")
+            
+        elif msg.topic == self.STATUS_RESPONSE:
             # Set flag indicating that the device is responding to commands
-            self.dict['command_response_received'] = True
+            self.status['response_received'] = True
             print("!!!great, response received here")
-            client.unsubscribe("iot_device/command_response")
+            self.unsubscribe(self.STATUS_RESPONSE)
             print("unsubscribe response")
 
-    def connect(self):
-        # Connect to MQTT broker and start client loop
-        self.client.connect(CONFIG.CONNECTION.BROKER, CONFIG.CONNECTION.PORT, 60)
-        self.client.loop_start()
+    # def connect(self):
+    #     # Connect to MQTT broker and start client loop
+    #     self.client.connect(CONFIG.CONNECTION.BROKER, CONFIG.CONNECTION.PORT, 60)
+    #     self.client.loop_start()
 
-        # Wait for connection to be established
-        while not self.connected:
-            print("trying to reconnect to the broker :(")
-            time.sleep(1)
+    #     # Wait for connection to be established
+    #     while not self.connected:
+    #         print("trying to reconnect to the broker :(")
+    #         time.sleep(1)
 
     # def disconnect(self):
     #     # Stop client loop and disconnect from MQTT broker
@@ -67,28 +83,28 @@ class StatusChecker:
         # Wait for timeout seconds or until a status update and command response are received
         start_time = time.time()
         while (time.time() - start_time) < timeout:
-            if self.dict['heartbeat'] and self.dict['command_response_received']:
+            if self.status['heartbeat'] and self.status['response_received']:
                 break
-            time.sleep(1)
 
         # Return boolean value indicating device verification status
-        return self.dict['heartbeat'] and self.dict['command_response_received']
+        return self.status['heartbeat'] and self.status['response_received']
+
 
     def get_device_status(self, timeout=20.0):
         # Connect to MQTT broker and subscribe to topics
         self.connect()
-        self.client.message_callback_add("iot_device/heartbeat", self.on_message)
-        self.client.message_callback_add("iot_device/command_response", self.on_message)
+        self.client.message_callback_add(self.DEVICE_HEARTBEAT, self.on_message)
+        self.client.message_callback_add(self.STATUS_RESPONSE, self.on_message)
 
         # Wait for status update and send command to device
         time_wait = time.time() + timeout   # Loop for 5 seconds
         while time.time() < time_wait:
             self.client.loop()
-            if self.dict['heartbeat']:
+            if self.status['heartbeat']:
                 print("heartbeat detected")
                 break
         
-        if self.dict['heartbeat']:
+        if self.status['heartbeat']:
             self.send_command()
             
             # Wait for command response and check device status
@@ -108,17 +124,17 @@ def main():
     max_attempts = 3
     delay = 1
     attempt = 0
-    while attempt < max_attempts:
-        print(f"attempt {attempt}\n---")
-        try:
-            cli = StatusChecker()
-            print(cli.get_device_status())
-            return
-        except Exception as e:
-            print() 
-            print(f"Exception occurred ({str(e)}), retrying in {delay} seconds")
-            time.sleep(delay)
-            attempt += 1
+    
+    # print(f"attempt {attempt}\n---")
+    try:
+        cli = StatusChecker(client_id = "status_checker", host="121.41.94.38")
+        print(cli.get_device_status())
+        return
+    except Exception as e:
+        print() 
+        print(f"Exception occurred ({str(e)}), retrying in {delay} seconds")
+        time.sleep(delay)
+            
             
     print(f"number of attempts is ({attempt})")
     

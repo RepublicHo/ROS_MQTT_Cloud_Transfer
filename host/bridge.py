@@ -48,12 +48,16 @@ class Bridge:
         """
         while self.rc != 0:
             try:
+                print("trying to reconnect to the broker :(")
                 self.rc = self.client.connect(self.host, self.port, self.keepalive)
             except:
                 # If the connection fails, wait for 2 seconds before trying again
-                print("Connection failed")
-                print("Kindly note that please have mosquitto properly installed and configured. \n From Mosquitto 2 and higher its only possible to login with localhost on that device. "
-                      +"\nFor another device you have to change some settings in mosquitto.conf (I encountered it in Aliyun). \n")
+                print("---")
+                print("oops... Connection failed, and here list some potential issues FYI")
+                print("1. Check the WIFI connection.")
+                print("2. Check the MQTT version in the cloud. You might encounter local loopback monitoring issue in mosquitto 2 and higher. (I encountered it in Aliyun). "
+                      +"\n You can downgrade MQTT to 1.6 stable or configure mosquitto.conf as appropriate.")
+                print(f"3. Check MQTT return code(rc), which currently is {self.rc} \n ---")
             time.sleep(2)
             self.timeout += 2
 
@@ -77,7 +81,9 @@ class Bridge:
         print(f"Connected to MQTT broker with result code {str(rc)}")
         self.client.subscribe(self.mqtt_topic)
         self.timeout = 0
-
+    def subscribe(self, topic):
+        self.client.subscribe(topic)
+        
     def on_disconnect(self, client, userdata, rc):
         """
         Callback function called when the client is unexpectedly disconnected from the broker
@@ -102,6 +108,13 @@ class Bridge:
         print("Unsubscribing")
         self.client.unsubscribe(self.mqtt_topic)
 
+    def unsubscribe(self, topic):
+        """
+        Unsubscribe from the MQTT topic
+        """
+        print(f"Unsubscribing topic {topic}")
+        self.client.unsubscribe(topic)
+        
     def disconnect(self):
         """
         Disconnect from the MQTT broker
