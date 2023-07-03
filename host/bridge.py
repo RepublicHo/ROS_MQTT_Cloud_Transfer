@@ -4,7 +4,7 @@ import time
 
 class Bridge:
     def __init__(self, mqtt_topic, client_id="bridge", user_id="", password="", 
-                 host="localhost", port="1883", keepalive=60, qos=0):
+                 host="localhost", port=1883, keepalive=60, qos=0):
         """
         Constructor method for the bridge class
         :param mqtt_topic: The topic to publish/subscribe to
@@ -48,17 +48,17 @@ class Bridge:
         """
         while self.rc != 0:
             try:
-                print("trying to reconnect to the broker :(")
+                print(f":D trying to reconnect to the broker on {self.host}")
                 self.rc = self.client.connect(self.host, self.port, self.keepalive)
             except:
                 # If the connection fails, wait for 2 seconds before trying again
                 print("---")
-                print("oops... Connection failed, and here list some potential issues FYI")
-                print("1. Check the WIFI connection.")
+                print("Oops... Connection failed, and here list some potential issues FYI")
+                print("1. Check the WIFI connection. Make sure the port num is an integer. ")
                 print("2. Check the MQTT version in the cloud. You might encounter local loopback monitoring issue in mosquitto 2 and higher. (I encountered it in Aliyun). "
                       +"\n You can downgrade MQTT to 1.6 stable or configure mosquitto.conf as appropriate.")
                 print(f"3. Check MQTT return code(rc), which currently is {self.rc} \n ---")
-            time.sleep(2)
+            time.sleep(1)
             self.timeout += 2
 
     def msg_process(self, msg):
@@ -80,7 +80,9 @@ class Bridge:
         """
         print(f"Connected to MQTT broker with result code {str(rc)}")
         self.client.subscribe(self.mqtt_topic)
+        
         self.timeout = 0
+        
     def subscribe(self, topic):
         self.client.subscribe(topic)
         
@@ -101,19 +103,17 @@ class Bridge:
         """
         self.msg_process(msg)
 
-    def unsubscribe(self):
-        """
-        Unsubscribe from the MQTT topic
-        """
-        print("Unsubscribing")
-        self.client.unsubscribe(self.mqtt_topic)
 
-    def unsubscribe(self, topic):
+
+    def unsubscribe(self, topic=None):
         """
         Unsubscribe from the MQTT topic
         """
-        print(f"Unsubscribing topic {topic}")
+        if topic == None:
+            topic = self.mqtt_topic
+        print(f"Unsubscribing {topic}")
         self.client.unsubscribe(topic)
+        
         
     def disconnect(self):
         """
@@ -127,10 +127,11 @@ class Bridge:
         """
         Callback function called when the client successfully unsubscribes from a topic
         """
-        if self.mqtt_topic == "#":
-            print("Unsubscribed from all topics")
-        else:
-            print(f"Unsubscribed from {self.mqtt_topic}")
+        # if self.mqtt_topic == "#":
+        #     print("Unsubscribed from all topics")
+        # else:
+        #     print(f"Unsubscribed from {self.mqtt_topic}")
+        print("Unsubscribed!")
 
     def on_subscribe(self, client, userdata, mid, granted_qos):
         """
@@ -141,13 +142,23 @@ class Bridge:
         else:
             print(f"Subscribed to {self.mqtt_topic}")
     
-    def publish(self, message, qos=0):
+    # def publish(self, message, qos=0):
+    #     """
+    #     Publish a message to the MQTT broker
+    #     :param message: The message to publish
+    #     """
+    #     self.client.publish(self.mqtt_topic, message, qos)
+    
+    def publish(self, topic, message="testing", qos=0):
         """
         Publish a message to the MQTT broker
         :param message: The message to publish
         """
-        self.client.publish(self.mqtt_topic, message, qos)
-
+        if topic is None:
+            topic = self.mqtt_topic
+        print(f"Publishing the message ('{message}') to topic {topic}")
+        self.client.publish(topic, message, qos)
+        
     def hook(self):
         """
         Gracefully shut down the MQTT client

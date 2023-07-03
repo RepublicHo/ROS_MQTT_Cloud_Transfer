@@ -5,11 +5,11 @@ import time
 
 
 class Vibot:
-    def __init__(self, command_topic = "iot_device/command", 
+    def __init__(self, status_check_topic = "/iot_device/status_check", 
                  client_id="device", user_id="", password="", 
                  host="43.133.159.102", port=1883, keepalive=60, qos=0):
        
-        self.command_topic = command_topic
+        self.status_check_topic = status_check_topic
         self.client_id = client_id
         self.user_id = user_id
         self.password = password
@@ -28,7 +28,6 @@ class Vibot:
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect
         self.client.on_message = self.on_message
-        self.client.on_disconnect = self.on_disconnect
 
         # Connect to the broker
         self.connect()
@@ -63,8 +62,8 @@ class Vibot:
         print("processing message")
         msg = str(msg.payload.decode())
         if msg == "status_check":
-            self.publish("/data/point_cloud", "point cloud sent!")
-            print("sent to iot_device/command_response")
+            self.publish("/iot_device/status_response", "status_ok")
+            print("sent to /iot_device/status_response")
         
         elif msg == "point_cloud":
             self.publish("iot_device/command_response", "")
@@ -97,7 +96,7 @@ class Vibot:
         Callback function called when the client successfully connects to the broker
         """
         print(f"Connected to MQTT broker with result code {str(rc)}")
-        self.client.subscribe(self.command_topic)
+        self.client.subscribe(self.status_check_topic)
         self.timeout = 0
         
         # Continuously publish device heartbeat 
@@ -106,13 +105,14 @@ class Vibot:
         # remaining daemon threads are terminated automatically. 
         heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
         heartbeat_thread.start()
+        
     
     def send_heartbeat(self):
         """
         Publish device heartbeat 
         """
         while True:
-            self.publish("iot_device/heartbeat", "heartbeat")
+            self.publish("/iot_device/heartbeat", "heartbeat")
             print("vibot: heartbeat sent")
             time.sleep(2)
         
@@ -136,12 +136,12 @@ class Vibot:
         print("iot device obtains the message in iot_device/command")
         self.msg_process(msg)
 
-    def unsubscribe(self):
-        """
-        Unsubscribe from the MQTT topic
-        """
-        print("Unsubscribing")
-        self.client.unsubscribe(self.command_topic)
+    # def unsubscribe(self):
+    #     """
+    #     Unsubscribe from the MQTT topic
+    #     """
+    #     print("Unsubscribing")
+    #     self.client.unsubscribe(self.status_check_topic)
 
     def disconnect(self):
         """
@@ -163,7 +163,7 @@ class Vibot:
         """
         Gracefully shut down the MQTT client
         """
-        self.unsubscribe()
+        # self.unsubscribe()
         self.disconnect()
         print("Shutting down")
 

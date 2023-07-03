@@ -26,8 +26,7 @@ class DeviceCommander(Bridge):
         :param qos: The Quality of Service that determines the level of guarantee 
         for message delivery between MQTT client and broker. 
         """
-        
-        
+
         
         self.DATA_TOPISCS = {"point_cloud": "/data/point_cloud",
                              "image": "/data/img"}
@@ -56,6 +55,8 @@ class DeviceCommander(Bridge):
             self.timeout = 0
         else:
             self.connected = False
+    
+ 
     
     # Define the function to handle incoming messages
     def on_message(self, client, userdata, msg):

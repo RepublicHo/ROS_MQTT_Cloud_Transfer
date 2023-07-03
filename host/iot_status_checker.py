@@ -8,7 +8,7 @@ from bridge import Bridge
 class StatusChecker(Bridge):
     def __init__(self, client_id = "client", 
                  user_id="", password="", 
-                 host="localhost", port="1883", keepalive=60, qos=0): 
+                 host="localhost", port=1883, keepalive=60, qos=0): 
         
         # connected is used for checking if the host can connected to the MQTT broker
         self.connected = False
@@ -26,7 +26,7 @@ class StatusChecker(Bridge):
         self.STATUS_CHECK = "/iot_device/status_check"
         self.STATUS_RESPONSE = "/iot_device/status_response"
         
-        super().__init__(client_id, user_id, 
+        super().__init__(self.DEVICE_HEARTBEAT, client_id, user_id, 
                          password, host, port, keepalive, qos)
 
     def on_connect(self, client, userdata, flags, rc):
@@ -34,28 +34,29 @@ class StatusChecker(Bridge):
         print(f"Connected to MQTT broker with result code {rc}")
         self.connected = True
         # Subscribe to the device's heartbeat topic    
-        client.subscribe(self.DEVICE_HEARTBEAT)
+        self.subscribe(self.DEVICE_HEARTBEAT)
 
     def msg_process(self, msg):
         
         print(f"Received message on topic {msg.topic}: {msg.payload.decode()}")
         
         if msg.topic == self.DEVICE_HEARTBEAT:
+            
             # Set flag indicating that a heartbeat has been received
             self.status['heartbeat'] = True
             print(":) The heartbeat of vibot received")
             self.unsubscribe(self.DEVICE_HEARTBEAT)
             self.subscribe(self.STATUS_RESPONSE)
             # it can be replaced by passwords or others related to cryptography
-            self.publish(self.STATUS_CHECK, "status_check", 2)
-            print("unsubscribe /iot_device/heartbeat\n")
+            # self.publish(topic=self.STATUS_CHECK, message="status_check", qos=2)
+
             
         elif msg.topic == self.STATUS_RESPONSE:
             # Set flag indicating that the device is responding to commands
             self.status['response_received'] = True
             print("!!!great, response received here")
             self.unsubscribe(self.STATUS_RESPONSE)
-            print("unsubscribe response")
+
 
     # def connect(self):
     #     # Connect to MQTT broker and start client loop
@@ -75,8 +76,7 @@ class StatusChecker(Bridge):
     def send_command(self):
         # Send command to device to verify connectivity
         
-        print("Sending command to iot_device/command")
-        self.client.publish("iot_device/command", "status_check")
+        self.publish(topic=self.STATUS_CHECK, message="status_check", qos=2)
         time.sleep(1)
 
     def check_device_status(self, timeout=20.0):
@@ -98,25 +98,36 @@ class StatusChecker(Bridge):
 
         # Wait for status update and send command to device
         time_wait = time.time() + timeout   # Loop for 5 seconds
+
+
+        self.client.loop_start()
         while time.time() < time_wait:
-            self.client.loop()
-            if self.status['heartbeat']:
+        
+            if self.status['heartbeat'] == True:
                 print("heartbeat detected")
                 break
-        
+            time.sleep(1)
+
         if self.status['heartbeat']:
             self.send_command()
-            
+            print("Spring")
             # Wait for command response and check device status
-            verification_status = self.check_device_status(timeout)
+            self.status_code = self.check_device_status(timeout)
 
             # Disconnect from MQTT broker and return device verification status
             # self.disconnect()
             self.client.loop_stop()
-            return verification_status
+            print(f"status code: {self.status_code}")
+            return self.status_code
+                
         else:
             self.client.loop_stop()
+            print("summer")
             return False
+                
+        
+        
+        
 
 
 # Test code
@@ -126,17 +137,17 @@ def main():
     attempt = 0
     
     # print(f"attempt {attempt}\n---")
-    try:
-        cli = StatusChecker(client_id = "status_checker", host="121.41.94.38")
-        print(cli.get_device_status())
-        return
-    except Exception as e:
-        print() 
-        print(f"Exception occurred ({str(e)}), retrying in {delay} seconds")
-        time.sleep(delay)
+    
+    cli = StatusChecker(client_id = "status_checker", host="43.133.159.102", port=1883)
+    print(cli.get_device_status())
+        
+    # except Exception as e:
+    #     print() 
+    #     print(f"Exception occurred ({str(e)}), retrying in {delay} seconds")
+    #     time.sleep(delay)
             
             
-    print(f"number of attempts is ({attempt})")
+    # print(f"number of attempts is ({attempt})")
     
 if __name__ == "__main__":
     main()
