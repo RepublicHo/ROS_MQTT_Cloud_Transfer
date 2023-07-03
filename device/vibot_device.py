@@ -2,7 +2,7 @@ import paho.mqtt.client as mqtt
 import threading
 import json
 import time
-
+import subprocess
 
 class Vibot:
     def __init__(self, status_check_topic = "/iot_device/status_check", 
@@ -65,6 +65,14 @@ class Vibot:
             self.publish("/iot_device/status_response", "status_ok")
             print("sent to /iot_device/status_response")
         
+        elif msg == "enable_vio_service":
+            curl_command = "curl -X PUT https://httpbin.org/put -H \"Content-Type: application/json\" -d '{\"name\": \"John\", \"age\": 30}'"
+            # Execute the curl command and capture the output
+            result = subprocess.check_output(curl_command, shell=True)
+
+            # Print the output to the console
+            print(result)
+            
         elif msg == "point_cloud":
             self.publish("iot_device/command_response", "")
             print("sent to iot_device/command_response")
