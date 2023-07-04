@@ -5,6 +5,10 @@ import requests
 import time
 import subprocess
 import re
+import rospy
+import numpy as np
+from sensor_msgs.msg import PointCloud
+import struct
 
 class Vibot:
     def __init__(self, status_check_topic = "/iot_device/status_check", command_topic = "/iot_device/command",
@@ -57,6 +61,55 @@ class Vibot:
         print("Disconnecting")
         self.disconnect_flag = True
         self.client.disconnect()
+        
+    def callback(self, data):
+        # global variables for testing
+        global msg_index, num_index, sum
+
+        # Convert the PointCloud2 message to a list of points. 
+        point_array = np.array([(p.x, p.y, p.z) for p in data.points])
+        cloud_points = point_array.tolist()
+
+        # Convert each tuple in the list of points to a list of floats
+        cloud_points_float = [[float(i) for i in point] for point in cloud_points]
+
+        # Flatten the list of lists into a single list of floats
+        cloud_points_flat = [coord for point in cloud_points_float for coord in point]
+
+        # Test code: Save the binary message to a file with an index in the filename.
+        filename = 'cloud_pub_%d.txt' % msg_index
+        with open(filename, 'w') as f:
+            for point in cloud_points_flat:
+                sum += point
+                f.write(str(num_index) + " " + str(point) + " " + str(sum) + '\n')
+                num_index += 1
+
+        # Increment the message index.
+        msg_index += 1
+
+        # Pack the list of floats into a binary string
+        binary_msg = struct.pack('<%sf' % len(cloud_points_flat), *cloud_points_flat)
+
+        # Publish the binary message to the MQTT topic
+        self.publish("/data/point_cloud", binary_msg)
+
+        rospy.loginfo("Forwarder forwards point cloud message with payload size %d " % len(binary_msg))    
+
+    def point_cloud_transfer(self):
+        rospy.init_node('point_cloud_forwarder', anonymous=True)
+
+        # mqtt topic named ABC is for testing 
+        # Create an instance of the ToMqttBridge class
+        # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead. 
+        # bridge = ToMqttBridge(mqtt_topic="ABC", host="121.41.94.38", port=1883, qos=2)
+
+        # Subscribe to the point cloud input topic and set the callback function
+        rospy.Subscriber('/PR_BE/point_cloud', PointCloud, self.callback)
+
+        # Start the MQTT client's event loop
+        self.looping()
+        
+        rospy.spin()
         
     def msg_process(self, msg):
         """
@@ -111,8 +164,10 @@ class Vibot:
             self.publish("/iot_device/command_response", json_message)
                         
         elif msg == "point_cloud":
+            message = {'type': 'point_cloud_transfer', 'code': 200}
             self.publish("iot_device/command_response", "")
             print("sent to iot_device/command_response")
+            self.point_cloud_transfer()
             
         elif msg == "end_point_cloud":
             print("End sending point cloud")

@@ -5,7 +5,7 @@ import rospy
 import struct
 import paho.mqtt.publish as publish
 import numpy as np
-from sensor_msgs.msg import PointCloud2
+from sensor_msgs.msg import PointCloud
 from sensor_msgs import point_cloud2
 
 

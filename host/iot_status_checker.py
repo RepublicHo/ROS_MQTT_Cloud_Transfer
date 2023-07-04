@@ -109,7 +109,7 @@ class StatusChecker(Bridge):
 
         if self.status['heartbeat']:
             self.send_command()
-            print("Here comes the sun!")
+            print(":) We have verify the IoT device. Let's move on!")
             # Wait for command response and check device status
             self.status_code = self.check_device_status(timeout)
 
@@ -121,13 +121,13 @@ class StatusChecker(Bridge):
                 
         else:
             self.client.loop_stop()
-            print("summer")
-            return False
+            print(":( Please be advised that the vibot may fail to connect to the Internet.")
+            print("1. Try to reboot the Vibot and check its network. ")
+            print("2. Try to reboot this program. ")
+            return 0
                 
         
-        
-        
-
+    
 
 # Test code
 def main():
