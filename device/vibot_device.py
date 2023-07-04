@@ -7,11 +7,12 @@ import subprocess
 import re
 
 class Vibot:
-    def __init__(self, status_check_topic = "/iot_device/status_check", 
+    def __init__(self, status_check_topic = "/iot_device/status_check", command_topic = "/iot_device/command",
                  client_id="device", user_id="", password="", 
                  host="43.133.159.102", port=1883, keepalive=60, qos=0):
        
         self.status_check_topic = status_check_topic
+        self.command_topic = command_topic
         self.client_id = client_id
         self.user_id = user_id
         self.password = password
@@ -68,6 +69,7 @@ class Vibot:
             print("sent to /iot_device/status_response")
         
         elif msg == "enable_vio_service":
+            
             url = 'http://localhost:8000/Smart/algorithmEnable'
 
             # Define the data to update the resource with
@@ -125,6 +127,7 @@ class Vibot:
         """
         print(f"Connected to MQTT broker with result code {str(rc)}")
         self.client.subscribe(self.status_check_topic)
+        self.client.subscribe(self.command_topic)
         self.timeout = 0
         
         # Continuously publish device heartbeat 
@@ -144,9 +147,9 @@ class Vibot:
             print("vibot: heartbeat sent")
             
             #testing code 
-            payload = {"name": "John", "age": 30, "city": "New York"}
-            json_payload = json.dumps(payload)
-            self.publish("/iot_device/command_response", json_payload)
+            # payload = {"name": "John", "age": 30, "city": "New York"}
+            # json_payload = json.dumps(payload)
+            # self.publish("/iot_device/command_response", json_payload)
             
             time.sleep(2)
         

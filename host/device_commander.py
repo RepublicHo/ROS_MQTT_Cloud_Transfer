@@ -147,7 +147,8 @@ class DeviceCommander(Bridge):
         :param message: The message to publish
         """
         if self.connected:
-            self.client.publish(topic, message, qos) 
+            self.client.publish(topic, message, qos)
+            print(f"published a message to topic {topic}") 
         else:
             print("Oops, no connection currently!!!")
             
