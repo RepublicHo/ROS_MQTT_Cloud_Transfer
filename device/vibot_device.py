@@ -83,18 +83,33 @@ class Vibot:
 
             # Make the HTTP PUT request
             response = requests.put(url)
-            print(response)
+            # print(response)
             # Check the response status code
             if response.status_code == 200:
                     
-                    print('Vio algorithm enabled')
+                    print('Vio algorithm enabled\n')
             else:
-                    print('Failed to enable vio algorithm, please enable it manually.')
+                    print('Failed to enable vio algorithm, please enable it manually\n')
             
-            message = {'type': 'vio_algorithm', 'code': response.status_code}
+            message = {'type': 'enable_vio', 'code': response.status_code}
             json_message = json.dumps(message)
-            self.publish("iot_device/command_response", json_message)
+            self.publish("/iot_device/command_response", json_message)
+        
+        elif msg == "disable_vio_service":
             
+            url = 'http://localhost:8000/Smart/algorithmDisable'
+
+            response = requests.put(url)
+
+            if response.status_code == 200:
+                    print('Vio algorithm disabled\n')
+            else:
+                    print('Failed to enable vio algorithm, please disable it manually\n')
+            
+            message = {'type': 'disable_vio', 'code': response.status_code}
+            json_message = json.dumps(message)
+            self.publish("/iot_device/command_response", json_message)
+                        
         elif msg == "point_cloud":
             self.publish("iot_device/command_response", "")
             print("sent to iot_device/command_response")

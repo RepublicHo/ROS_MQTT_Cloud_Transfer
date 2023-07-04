@@ -63,7 +63,7 @@ class DeviceCommander(Bridge):
     # Define the function to handle incoming messages
     def on_message(self, client, userdata, msg):
         # Decode the base64-encoded message payload
-        data = base64.b64decode(msg.payload)
+        # data = base64.b64decode(msg.payload)
         # testing code
         # print("msg: " + msg)
         # print("data: " + data)
@@ -73,14 +73,26 @@ class DeviceCommander(Bridge):
             if self.status == 1 and msg.topic == self.COMMAND_RESPONSE:       
                 self.msg_process(msg)
     
+    def is_json(self, string):
+        try:
+            json_object = json.loads(string)
+        except ValueError:
+            return False
+        return True
     
     def msg_process(self, msg):
         
-        self.vio_enabled = True
+        if self.is_json(msg):
+            # Decode the message payload from JSON format
+            json_msg = json.loads(msg.payload.decode())
+            print("Received message: ", json_msg)
+            
+            if json_msg['type'] == "enable_vio" and json_msg['code'] == 200:
+                self.vio_enabled = True
+            elif json_msg['type'] == "disable_vio" and json_msg['code'] == 200:
+                self.vio_enabled = False
         
-        # Decode the message payload from JSON format
-        json_payload = json.loads(msg.payload.decode())
-        print("Received message: ", json_payload)
+        
         # Handle the data based on the topic and its type
         # if msg.topic == self.DATA_TOPISCS[""]:
         #     pass
@@ -139,7 +151,46 @@ class DeviceCommander(Bridge):
     
     # Define the function to enable the vio capturing algorithm
     def enable_vio_algorithm(self):
+        
+        self.client.loop_start()
+        # Wait for 10 seconds and see if we can subscribe to message from topic RESPONSE
+        
         self.publish(self.COMMAND, "enable_vio_service")
+        time.sleep(5)
+        if self.vio_enabled:
+            print("Successfully enabled vio service")
+        else:
+            self.publish(self.COMMAND, "enable_vio_service")
+            time.sleep(5)
+            if self.vio_enabled:
+                print("Successfully enabled vio service")
+                
+            else:
+                print("Failed to enable vio service")
+        
+
+        self.client.loop_stop()
+        
+    # Define the function to disable the vio capturing algorithm
+    def disable_vio_algorithm(self):
+        
+        self.client.loop_start()
+        # Wait for 10 seconds and see if we can subscribe to message from topic RESPONSE
+        
+        self.publish(self.COMMAND, "disable_vio_service")
+        time.sleep(5)
+        if not self.vio_enabled:
+            print("Successfully disabled vio service")
+        else:
+            self.publish(self.COMMAND, "disable_vio_service")
+            time.sleep(5)
+            if not self.vio_enabled:
+                print("Successfully disabled vio service")
+            else:
+                print("Failed to disable vio service")
+        
+
+        self.client.loop_stop()
     
     def publish(self, topic, message, qos=0):
         """
@@ -174,6 +225,7 @@ class DeviceCommander(Bridge):
         self.clear()
         self.status = self.check_device_power_status()
         self.clear()
+        
         if self.status == 1:
             
             # network_thread = threading.Thread(self.)
@@ -184,49 +236,41 @@ class DeviceCommander(Bridge):
                 '¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯'
             )
             print("::: INFO :::")
-            
+                
             # Define the menu options
             menu_options = [
-                {"name": "Image", "value": 1},
-                {"name": "Point Cloud", "value": 2},
-                {"name": "Exit", "value": 0},
+                {"name": "Enable Vio algorithm Service", "value": 1},
+                {"name": "Disable Vio algorithm Service", "value": 2},
+                {"name": "Obtaining images", "value": 3},
+                {"name": "Point Cloud", "value": 4},
+                {"name": "Exit", "value": 0}
             ]
-            self.client.loop_start()
-            
-            # Wait for 10 seconds and see if we can subscribe to message from topic RESPONSE
-            time.sleep(10)
-            if self.vio_enabled:
-                print("Success")
-            else:
-                self.enable_vio_algorithm()
-                time.sleep(5)
-                if self.vio_enabled:
-                    print("Success")
-                else:
-                    print("Failed")
-            
-            time.sleep(20)
-            self.client.loop_stop()
-            #   Display the menu and prompt the user for input
-            # while True:
-            #     # Display the menu options
-            #     print("Menu:")
-            #     for option in menu_options:
-            #         print(f"{option['value']}. {option['name']}")
                 
-            #     # Prompt the user for input
-            #     choice = input("Enter your choice: ")
                 
-            #     # Handle the user's choice
-            #     if choice == "0":
-            #         print("Exiting...")
-            #         break
+                #   Display the menu and prompt the user for input
+            while True:
+            # Display the menu options
+                print("Menu:")
+                for option in menu_options:
+                    print(f"{option['value']}. {option['name']}")
+                    
+                # Prompt the user for input
+                choice = input("Enter your choice: ")
+                
+                # Handle the user's choice
+                if choice == "0":
+                    print("Exiting...")
+                    break
+                elif choice == "1":
+                    self.enable_vio_algorithm()
+                elif choice == "2":
+                    self.disable_vio_algorithm()
             #     elif choice.isdigit() and int(choice) in [option["value"] for option in menu_options]:
             #         chosen_option = [option for option in menu_options if option["value"] == int(choice)][0]
             #         print(f"You chose {chosen_option['name']}.")
                     
-            #     else:
-            #         print("Invalid choice. Please try again.")
+                else:
+                    print("Invalid choice. Please try again.")
     
     
     # Define the function to initiate data transfer
