@@ -1,6 +1,7 @@
 import paho.mqtt.client as mqtt
 import threading
 import json
+import requests
 import time
 import subprocess
 import re
@@ -42,7 +43,7 @@ class Vibot:
                 self.rc = self.client.connect(self.host, self.port, self.keepalive)
             except:
                 # If the connection fails, wait for 2 seconds before trying again
-                print("Connection failed")
+                print("Connection failed, please check WiFi connection or MQTT broker in the cloud.")
                 
             time.sleep(2)
             self.timeout += 2
@@ -67,15 +68,30 @@ class Vibot:
             print("sent to /iot_device/status_response")
         
         elif msg == "enable_vio_service":
-            curl_command =  "curl -X PUT http://localhost:8000/Smart/algorithmEnable"
-            # Execute the curl command and capture the output
-            string1 = subprocess.check_output(curl_command, shell=True)
+            url = 'http://localhost:8000/Smart/algorithmEnable'
 
-            # Extract the JSON string using regex
-            json_string = re.search(r"b'({.*})'", string1).group(1)
-            # Print the output to the console
-            json_dict = json.loads(json_string)
-            self.publish("iot_device/command_response", json_dict)
+            # Define the data to update the resource with
+            data = {'name': 'John Smith', 'age': 35}
+
+            # Encode the data as JSON
+            # json_data = json.dumps(data)
+
+            # Define the headers for the request
+            # headers = {'Content-type': 'application/json'}
+
+            # Make the HTTP PUT request
+            response = requests.put(url)
+            print(response)
+            # Check the response status code
+            if response.status_code == 200:
+                    
+                    print('Vio algorithm enabled')
+            else:
+                    print('Failed to enable vio algorithm, please enable it manually.')
+            
+            message = {'type': 'vio_algorithm', 'code': response.status_code}
+            json_message = json.dumps(message)
+            self.publish("iot_device/command_response", json_message)
             
         elif msg == "point_cloud":
             self.publish("iot_device/command_response", "")

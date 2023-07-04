@@ -44,6 +44,8 @@ class DeviceCommander(Bridge):
         self.COMMAND = "/iot_device/command"
         self.COMMAND_RESPONSE = "/iot_device/command_response"
         
+        self.vio_enabled = False
+        
         super().__init__(self.COMMAND_RESPONSE, client_id, user_id, 
                          password, host, port, keepalive, qos)
     
@@ -68,11 +70,13 @@ class DeviceCommander(Bridge):
         print("Commander received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
         
         with self.lock:
-            if self.status == 1 and msg.topic == self.COMMAND_RESPONSE:
+            if self.status == 1 and msg.topic == self.COMMAND_RESPONSE:       
                 self.msg_process(msg)
     
     
     def msg_process(self, msg):
+        
+        self.vio_enabled = True
         
         # Decode the message payload from JSON format
         json_payload = json.loads(msg.payload.decode())
@@ -135,7 +139,7 @@ class DeviceCommander(Bridge):
     
     # Define the function to enable the vio capturing algorithm
     def enable_vio_algorithm(self):
-        self.publish()
+        self.publish(self.COMMAND, "enable_vio_service")
     
     def publish(self, topic, message, qos=0):
         """
@@ -187,6 +191,18 @@ class DeviceCommander(Bridge):
                 {"name": "Exit", "value": 0},
             ]
             self.client.loop_start()
+            
+            # Wait for 10 seconds and see if we can subscribe to message from topic RESPONSE
+            time.sleep(10)
+            if self.vio_enabled:
+                print("Success")
+            else:
+                self.enable_vio_algorithm()
+                time.sleep(5)
+                if self.vio_enabled:
+                    print("Success")
+                else:
+                    print("Failed")
             
             time.sleep(20)
             self.client.loop_stop()
