@@ -8,7 +8,7 @@ import logging
 class ImageForwarder(Bridge):
     
     def __init__(self, mqtt_topic, client_id = "pc_forwarder", 
-                 num_images = 10, user_id="", password="", 
+                 num_images = 3, user_id="", password="", 
                  host="localhost", port="1883", keepalive=60, qos=0, 
                  exit_on_complete = True, enable_logging=True):
         """
@@ -69,7 +69,7 @@ class ImageForwarder(Bridge):
                     rospy.signal_shutdown("Image forwarding complete")
                     
         except Exception as e:
-            self.logger.error("Error forwarding image: {}".format(e))
+            self.logger.error("Error occurs when forwarding image: {}".format(e))
         
     def run(self):
         # Spin the ROS node to receive messages

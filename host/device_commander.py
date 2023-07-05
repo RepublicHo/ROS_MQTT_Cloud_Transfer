@@ -1,12 +1,13 @@
 import paho.mqtt.client as mqtt
-import base64
-import struct
+import numpy as np
 import time
 import sys
 import queue
-# import rospy
+from sensor_msgs.msg import Image
+import rospy
 import threading
 import os
+import cv2
 import json
 import config as CONFIG
 import iot_status_checker as isc
@@ -83,6 +84,9 @@ class DeviceCommander(Bridge):
             # print(1)
         elif msg.topic == self.DATA_TOPISCS["point_cloud"]:
             self.process_point_cloud(msg)
+        
+        elif msg.topic == self.DATA_TOPISCS["image"]:
+            self.process_image(msg)
             
         elif self.status == 1:
             if msg.topic == self.COMMAND_RESPONSE:       
@@ -126,9 +130,12 @@ class DeviceCommander(Bridge):
     def process_point_cloud(self, msg):
         """
         Function to process the point cloud data received from the IoT device
+        TODO: properly save/visualize the point cloud data. 
         """
-        print("Received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
-        
+        try:
+            print("Received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
+        except Exception as e:
+            pass
         # Unpack the binary message into a list of floats
         # point_clouds_flat = struct.unpack('<%sf' % (len(msg.payload) // 4), msg.payload)
 
@@ -139,8 +146,35 @@ class DeviceCommander(Bridge):
     def process_image(self, msg):
         """
         Function to process the image data received from the IoT device
+        TODO: properly save/visualize the image data. 
         """
-        pass
+        try:
+            print("Received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
+            
+            # code for saving the image data in the folder. 
+            image_msg = Image()
+            image_msg.deserialize(msg.payload)
+            
+            # Convert the Image message to numpy array
+            image_np = cv2.imdecode(np.fromstring(image_msg.data, np.uint8), cv2.IMREAD_COLOR)
+                        
+            # Generate a unique filename based on the timestamp
+            filename = str(time.time()) + ".jpg"
+
+            # Get the path to the img_data folder
+            folder_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "img_data")
+
+            # Create the img_data folder if it doesn't exist
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+
+            # Write the image data to a file in the img_data folder
+            file_path = os.path.join(folder_path, filename)
+            cv2.imwrite(file_path, image_np)
+
+        except Exception as e:
+            pass
+
     
     def send_commands(self, value):
         """
@@ -370,7 +404,6 @@ def main():
     
     commander_bridge.menu()
 
-    
 if __name__ == '__main__':
     # try:
     main()

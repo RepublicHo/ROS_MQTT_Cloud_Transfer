@@ -74,7 +74,7 @@ class Vibot:
         pc_bridge = PointCloudForwarder(mqtt_topic="/data/point_cloud", host="43.133.159.102", port=1883, qos=2)
 
         # Subscribe to the point cloud input topic and set the callback function
-        rospy.Subscriber('/PR_BE/point_cloud', PointCloud, pc_bridge.point_cloud_callback)
+        rospy.Subscriber('/PR_BE/point_cloud', PointCloud, pc_bridge.pc_callback)
 
         # Start the MQTT client's event loop
         pc_bridge.looping()
@@ -157,7 +157,8 @@ class Vibot:
                         
         elif msg == "point_cloud":
             message = {'type': 'point_cloud_transfer', 'code': 200}
-            self.publish("iot_device/command_response", message=message)
+            json_message = json.dumps(message)
+            self.publish("/iot_device/command_response", message=json_message)
             print("--log--: sent to iot_device/command_response indicating we are starting the point cloud transfer")
             
             try:
@@ -170,7 +171,8 @@ class Vibot:
             
         elif msg == "image":
             message = {'type': 'image_transfer', 'code': 200}
-            self.publish("iot_device/command_response", message=message)
+            json_message = json.dumps(message)
+            self.publish("iot_device/command_response", message=json_message)
             print("--log--: sent to iot_device/image indicating we are starting the image transfer")
             
             try:
