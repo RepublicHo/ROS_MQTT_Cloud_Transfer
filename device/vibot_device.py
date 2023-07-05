@@ -3,11 +3,12 @@ import threading
 import json
 import requests
 import time
-import subprocess
-import re
 import rospy
 import numpy as np
 from sensor_msgs.msg import PointCloud
+from sensor_msgs.msg import Image
+from point_cloud_forwarder import PointCloudForwarder
+from image_forwarder import ImageForwarder
 import struct
 
 class Vibot:
@@ -53,7 +54,6 @@ class Vibot:
             time.sleep(2)
             self.timeout += 2
 
-
     def disconnect(self):
         """
         Disconnect from the MQTT broker
@@ -61,55 +61,47 @@ class Vibot:
         print("Disconnecting")
         self.disconnect_flag = True
         self.client.disconnect()
-        
-    def callback(self, data):
-        # global variables for testing
-        global msg_index, num_index, sum
-
-        # Convert the PointCloud2 message to a list of points. 
-        point_array = np.array([(p.x, p.y, p.z) for p in data.points])
-        cloud_points = point_array.tolist()
-
-        # Convert each tuple in the list of points to a list of floats
-        cloud_points_float = [[float(i) for i in point] for point in cloud_points]
-
-        # Flatten the list of lists into a single list of floats
-        cloud_points_flat = [coord for point in cloud_points_float for coord in point]
-
-        # Test code: Save the binary message to a file with an index in the filename.
-        filename = 'cloud_pub_%d.txt' % msg_index
-        with open(filename, 'w') as f:
-            for point in cloud_points_flat:
-                sum += point
-                f.write(str(num_index) + " " + str(point) + " " + str(sum) + '\n')
-                num_index += 1
-
-        # Increment the message index.
-        msg_index += 1
-
-        # Pack the list of floats into a binary string
-        binary_msg = struct.pack('<%sf' % len(cloud_points_flat), *cloud_points_flat)
-
-        # Publish the binary message to the MQTT topic
-        self.publish("/data/point_cloud", binary_msg)
-
-        rospy.loginfo("Forwarder forwards point cloud message with payload size %d " % len(binary_msg))    
+    
 
     def point_cloud_transfer(self):
+        # Initialize the ROS forwarder node, which can 
+        # 1. Subscribe to a topic in ROS
+        # 2. Immediately publish the point cloud message to the MQTT topic
         rospy.init_node('point_cloud_forwarder', anonymous=True)
-
-        # mqtt topic named ABC is for testing 
-        # Create an instance of the ToMqttBridge class
+ 
+        # Create an instance of the forwarder class
         # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead. 
-        # bridge = ToMqttBridge(mqtt_topic="ABC", host="121.41.94.38", port=1883, qos=2)
+        pc_bridge = PointCloudForwarder(mqtt_topic="/data/point_cloud", host="43.133.159.102", port=1883, qos=2)
 
         # Subscribe to the point cloud input topic and set the callback function
-        rospy.Subscriber('/PR_BE/point_cloud', PointCloud, self.callback)
+        rospy.Subscriber('/PR_BE/point_cloud', PointCloud, pc_bridge.point_cloud_callback)
 
         # Start the MQTT client's event loop
-        self.looping()
+        pc_bridge.looping()
         
         rospy.spin()
+    
+    def image_transfer(self):
+        
+        
+        # Create an instance of the forwarder class
+        # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead. 
+        img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=2)
+        
+        img_bridge.run()
+        
+    # def image_callback(self, msg):
+    #     # Convert the ROS message to a bytearray
+    #     data = bytearray(msg.data)
+    #     # Send the bytearray to the cloud endpoint
+    #     response = requests.post(cloud_url, data=data)
+    #     # Print the response status code (optional)
+    #     print("Cloud response:", response.status_code)
+    #     # Unsubscribe from the ROS topic
+    #     rospy.loginfo("Received image, unsubscribing from topic")
+    #     sub.unregister()
+        
+
         
     def msg_process(self, msg):
         """
@@ -165,16 +157,26 @@ class Vibot:
                         
         elif msg == "point_cloud":
             message = {'type': 'point_cloud_transfer', 'code': 200}
-            self.publish("iot_device/command_response", "")
-            print("sent to iot_device/command_response")
-            self.point_cloud_transfer()
+            self.publish("iot_device/command_response", message=message)
+            print("--log--: sent to iot_device/command_response indicating we are starting the point cloud transfer")
+            
+            try:
+                self.point_cloud_transfer()
+            except rospy.ROSInterruptException:
+                pass
             
         elif msg == "end_point_cloud":
             print("End sending point cloud")
             
         elif msg == "image":
-            self.publish("/data/point_cloud", "image sent!")
-            print("sent to iot_device/command_response")
+            message = {'type': 'image_transfer', 'code': 200}
+            self.publish("iot_device/command_response", message=message)
+            print("--log--: sent to iot_device/image indicating we are starting the image transfer")
+            
+            try:
+                self.image_transfer()
+            except rospy.ROSInterruptException:
+                pass
             
         elif msg == "end_image":
             print("End sending image")
