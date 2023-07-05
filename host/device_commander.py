@@ -347,6 +347,7 @@ class DeviceCommander(Bridge):
                 elif choice == "4":
                     self.subscribe(self.DATA_TOPISCS["image"])
                     self.publish(self.COMMAND, "image")
+                    self.looping()
                     
             #     elif choice.isdigit() and int(choice) in [option["value"] for option in menu_options]:
             #         chosen_option = [option for option in menu_options if option["value"] == int(choice)][0]
