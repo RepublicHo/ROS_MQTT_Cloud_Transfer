@@ -65,8 +65,9 @@ class DeviceCommander(Bridge):
         # print("msg: " + msg)
         # print("data: " + data)
         
-        # testing code 
-        # print("Commander received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
+        # testing code
+        if msg.topic != self.DEVICE_HEARTBEAT:
+            print("Commander received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
         
         if msg.topic == self.DEVICE_HEARTBEAT:
             self.last_heartbeat_time = time.time()
@@ -76,6 +77,7 @@ class DeviceCommander(Bridge):
             self.process_point_cloud(msg)
         
         elif msg.topic == self.DATA_TOPISCS["image"]:
+            
             self.process_image(msg)
             
         elif self.status == 1:
@@ -103,7 +105,9 @@ class DeviceCommander(Bridge):
             elif json_msg['type'] == "disable_vio" and json_msg['code'] == 200:
                 self.vio_enabled = False
             elif json_msg['type'] == "point_cloud_transfer" and json_msg['code'] == 200:
-                self.subscribe()
+                self.subscribe(topic=self.DATA_TOPISCS["point_cloud"])
+            elif json_msg['type'] == "image_transfer" and json_msg['code'] == 200:
+                self.subscribe(topic=self.DATA_TOPISCS["image"])
         
         # Handle the data based on the topic and its type
         # if msg.topic == self.DATA_TOPISCS[""]:
@@ -163,6 +167,7 @@ class DeviceCommander(Bridge):
             # cv2.imwrite(file_path, image_np)
 
         except Exception as e:
+            print("error")
             pass
 
     
@@ -366,12 +371,12 @@ class DeviceCommander(Bridge):
                 elif choice == "3":
                     self.subscribe(self.DATA_TOPISCS["point_cloud"])
                     self.publish(self.COMMAND, "point_cloud")
-                    self.looping()
+                    time.sleep(30)
                     
                 elif choice == "4":
                     self.subscribe(self.DATA_TOPISCS["image"])
                     self.publish(self.COMMAND, "image")
-                    self.looping()
+                    
                     
             #     elif choice.isdigit() and int(choice) in [option["value"] for option in menu_options]:
             #         chosen_option = [option for option in menu_options if option["value"] == int(choice)][0]

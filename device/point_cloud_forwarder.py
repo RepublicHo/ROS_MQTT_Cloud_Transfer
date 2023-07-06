@@ -4,6 +4,7 @@ import logging
 import rospy
 import struct
 import numpy as np
+import binascii
 from sensor_msgs.msg import PointCloud
 from bridge import Bridge
 
@@ -25,7 +26,7 @@ class PointCloudForwarder(Bridge):
     ):
         """
         Constructor method
-        :param mqtt_topic: The topic to publish/subscribe to
+        :param mqtt_topic: The topic to publish to (must not contain wildcards)
         :param client_id: The ID of the client
         :param user_id: The user ID for the broker
         :param password: The password for the broker
@@ -35,10 +36,8 @@ class PointCloudForwarder(Bridge):
         :param qos: The Quality of Service that determines the level of guarantee
         for message delivery between MQTT client and broker.
         """
-        # Initialize the ROS forwarder node, which can
-        # 1. Subscribe to a topic in ROS
-        # 2. Immediately publish a point cloud message to the MQTT topic
-        rospy.init_node("point_cloud_forwarder", anonymous=True)
+        if "#" in mqtt_topic or "+" in mqtt_topic:
+            raise ValueError("Publish topic cannot contain wildcards")
 
         # Subscribe to the ROS topic
         self.sub = rospy.Subscriber("/PR_BE/point_cloud", PointCloud, self.pc_callback)
@@ -60,28 +59,31 @@ class PointCloudForwarder(Bridge):
 
     def pc_callback(self, data):
         try:
-            # Convert the PointCloud message to a list of points.
+            # 1. Convert the PointCloud message to a list of points.
             point_array = np.array([(p.x, p.y, p.z) for p in data.points])
-
             cloud_points = point_array.tolist()
 
-            # Convert each tuple in the list of points to a list of floats
+            # 2. Convert each tuple in the list of points to a list of floats
             cloud_points_float = [[float(i) for i in point] for point in cloud_points]
 
-            # Flatten the list of lists into a single list of floats
+            # 3. Flatten the list of lists into a single list of floats
             cloud_points_flat = [coord for point in cloud_points_float for coord in point]
 
-            # Pack the list of floats into a binary string
+            # 4. Pack the list of floats into a binary string
             binary_msg = struct.pack("<%sf" % len(cloud_points_flat), *cloud_points_flat)
 
-            # Publish the binary message to the MQTT topic
-            self.publish(binary_msg)
+            # 5. Convert the binary message to hexadecimal format
+            hex_msg = binascii.hexlify(binary_msg).decode()
+
+            # Publish the hexadecimal message to the MQTT topic
+            self.publish(self.mqtt_topic, hex_msg)
             self.logger.info(
                 "Forwarded point cloud {} with payload size {}".format(
-                    self.num_point_clouds_forwarded, len(binary_msg)
+                    self.num_point_clouds_forwarded, len(hex_msg)
                 )
             )
-            # Increment the number of images forwarded
+            
+            # Increment the number of point clouds forwarded
             self.num_point_clouds_forwarded += 1
 
             # Unsubscribe from ROS topic if we have forwarded the desired number of point clouds

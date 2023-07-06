@@ -3,19 +3,10 @@ Configuration class, which is used to store configuration
 settings or constants that are used throughout an application.
 '''
 
-class APP:
-    APPLICATION = "Vibot "
-    AUTHOR = "Zhe-Jun HE"
-    VERSION = "V1.0"
-
-class CONNECTION:
-    # Aliyun by Zhe
-    BROKER = "43.133.159.102" 
+class MQTT_BROKER:
+    # TODO: Configure the Ip address of your own as appropriate
+    IP_ADDRESS = "43.133.159.102" 
     PORT = 1883
 
 
-class DEVICE:
-    
-    IP_ADDRESS = "192.168.1.73" #
-    HTTP_PORT = "8000"
     

@@ -11,7 +11,7 @@ class ImageForwarder(Bridge):
         self,
         mqtt_topic,
         client_id="image_forwarder",
-        num_images=3,
+        packet_size=1024,
         user_id="",
         password="",
         host="localhost",
@@ -25,6 +25,7 @@ class ImageForwarder(Bridge):
         Constructor method
         :param mqtt_topic: The topic to publish/subscribe to
         :param client_id: The ID of the client
+        :param packet_size: The maximum size of each packet in bytes
         :param user_id: The user ID for the broker
         :param password: The password for the broker
         :param host: The hostname or IP address of the broker
@@ -34,16 +35,11 @@ class ImageForwarder(Bridge):
         for message delivery between MQTT client and broker.
         """
 
-        # Initialize the ROS forwarder node, which can
-        # 1. Subscribe to a topic in ROS
-        # 2. Immediately publish a point cloud message to the MQTT topic
-        rospy.init_node("image_forwarder", anonymous=True)
-
         # Subscribe to the ROS topic
         self.sub = rospy.Subscriber("/PR_FE/feature_img", Image, self.image_callback)
 
-        self.num_images = num_images
-        self.num_images_forwarded = 0
+        self.packet_size = packet_size
+        self.num_packets_forwarded = 0
         self.exit_on_complete = exit_on_complete
 
         if enable_logging:
@@ -59,24 +55,31 @@ class ImageForwarder(Bridge):
 
     def image_callback(self, msg):
         try:
-            # Convert the ROS message to a bytearray
+            # 1. Convert the ROS message to a bytearray
             byte_array = bytearray(msg.data)
 
-            self.publish(message=byte_array)
+            # 2. Split the byte array into smaller packets
+            num_packets = (len(byte_array) + self.packet_size - 1) // self.packet_size
+            for i in range(num_packets):
+                start = i * self.packet_size
+                end = (i + 1) * self.packet_size
+                packet = byte_array[start:end]
+                self.publish(self.mqtt_topic, message=packet)
 
-            self.logger.info(
-                "Forwarded image {} with payload size {}".format(
-                    self.num_images_forwarded, len(byte_array)
+                self.logger.info(
+                    "Forwarded packet {} of {} with payload size {}".format(
+                        self.num_packets_forwarded + i + 1, num_packets, len(packet)
+                    )
                 )
-            )
-            # Increment the number of images forwarded
-            self.num_images_forwarded += 1
 
-            # Unsubscribe from the ROS topic if we've forwarded the desired number of images
-            if self.num_images_forwarded >= self.num_images:
+            # Increment the number of packets forwarded
+            self.num_packets_forwarded += num_packets
+
+            # Unsubscribe from the ROS topic if we've forwarded the desired number of packets
+            if self.num_packets_forwarded >= self.num_packets:
                 # Unsubscribe from the ROS topic
                 self.sub.unregister()
-                rospy.loginfo("Forwarded {} images, unsubscribing from topic".format(self.num_images))
+                rospy.loginfo("Forwarded {} packets, unsubscribing from topic".format(self.num_packets))
                 if self.exit_on_complete:
                     rospy.signal_shutdown("Image forwarding complete")
 

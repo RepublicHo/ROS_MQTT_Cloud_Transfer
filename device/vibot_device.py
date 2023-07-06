@@ -37,6 +37,11 @@ class Vibot:
         self.client.on_disconnect = self.on_disconnect
         self.client.on_message = self.on_message
 
+        # Initialize the ROS forwarder node, which can
+        # 1. Subscribe to a topic in ROS
+        # 2. Immediately publish a point cloud message to the MQTT topic
+        rospy.init_node("forwarder", anonymous=True)
+        
         # Connect to the broker
         self.connect()
 
@@ -85,7 +90,7 @@ class Vibot:
         # Create an instance of the forwarder class
         # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead.
         # TODO: you can specify how many images to transfer 
-        img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=2)
+        img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=0)
         img_bridge.run()
         
         

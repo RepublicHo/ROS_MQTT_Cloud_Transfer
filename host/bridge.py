@@ -156,7 +156,7 @@ class Bridge:
             topic = self.mqtt_topic
         if message is None:
             message = "Warning: You have not specified the message to publish. Check out the Bridge class!"
-        logging.info(f"Publishing messagethe message ('{message}') to topic {topic}")
+        logging.info(f"Publishing message the message ('{message}') to topic {topic}")
         self.client.publish(topic, message, qos)
         
     def hook(self):
