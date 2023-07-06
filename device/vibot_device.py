@@ -9,7 +9,7 @@ from sensor_msgs.msg import PointCloud
 from sensor_msgs.msg import Image
 from point_cloud_forwarder import PointCloudForwarder
 from image_forwarder import ImageForwarder
-import struct
+import logging
 
 class Vibot:
     def __init__(self, status_check_topic = "/iot_device/status_check", command_topic = "/iot_device/command",
@@ -47,61 +47,47 @@ class Vibot:
         while self.rc != 0:
             try:
                 self.rc = self.client.connect(self.host, self.port, self.keepalive)
-            except:
+            except Exception as e:
                 # If the connection fails, wait for 2 seconds before trying again
-                print("Connection failed, please check WiFi connection or MQTT broker in the cloud.")
+                # If the connection fails, log the error and wait for some time before trying again.
+                logging.error(f"Failed to connect to MQTT broker: {e}")
+                logging.info("Waiting for 2 seconds before retrying...")
+                time.sleep(2)
+                self.timeout += 2
                 
-            time.sleep(2)
-            self.timeout += 2
+                # Print some suggestions for potential soluations
+                print("---\nSuggestions: ")
+                print("1. Check the WIFI connection. Make sure the port num in the code is an integer instead of a string. ")
+                print("2. Check the MQTT version in the cloud. You might encounter local loopback monitoring issue in mosquitto 2 and higher. (I encountered it in Aliyun). "
+                      +"\n You may downgrade MQTT to 1.6 stable or configure mosquitto.conf as appropriate.")
+                print(f"3. Check MQTT return code(rc), which currently is {self.rc} \n---")
 
     def disconnect(self):
         """
         Disconnect from the MQTT broker
         """
-        print("Disconnecting")
+        logging.info("Disconnecting from MQTT broker...")
         self.disconnect_flag = True
         self.client.disconnect()
+        logging.info("Disconnected from MQTT broker...")
     
 
     def point_cloud_transfer(self):
-        # Initialize the ROS forwarder node, which can 
-        # 1. Subscribe to a topic in ROS
-        # 2. Immediately publish the point cloud message to the MQTT topic
-        rospy.init_node('point_cloud_forwarder', anonymous=True)
- 
+        
         # Create an instance of the forwarder class
         # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead. 
+        # TODO: you can specify how many point clouds to transfer 
         pc_bridge = PointCloudForwarder(mqtt_topic="/data/point_cloud", host="43.133.159.102", port=1883, qos=2)
-
-        # Subscribe to the point cloud input topic and set the callback function
-        rospy.Subscriber('/PR_BE/point_cloud', PointCloud, pc_bridge.pc_callback)
-
-        # Start the MQTT client's event loop
-        pc_bridge.looping()
-        
-        rospy.spin()
+        pc_bridge.run()
     
     def image_transfer(self):
         
-        
         # Create an instance of the forwarder class
-        # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead. 
+        # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead.
+        # TODO: you can specify how many images to transfer 
         img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=2)
-        
         img_bridge.run()
         
-    # def image_callback(self, msg):
-    #     # Convert the ROS message to a bytearray
-    #     data = bytearray(msg.data)
-    #     # Send the bytearray to the cloud endpoint
-    #     response = requests.post(cloud_url, data=data)
-    #     # Print the response status code (optional)
-    #     print("Cloud response:", response.status_code)
-    #     # Unsubscribe from the ROS topic
-    #     rospy.loginfo("Received image, unsubscribing from topic")
-    #     sub.unregister()
-        
-
         
     def msg_process(self, msg):
         """
@@ -166,8 +152,8 @@ class Vibot:
             except rospy.ROSInterruptException:
                 pass
             
-        elif msg == "end_point_cloud":
-            print("End sending point cloud")
+        # elif msg == "end_point_cloud":
+        #     print("End sending point cloud")
             
         elif msg == "image":
             message = {'type': 'image_transfer', 'code': 200}
@@ -180,8 +166,8 @@ class Vibot:
             except rospy.ROSInterruptException:
                 pass
             
-        elif msg == "end_image":
-            print("End sending image")
+        # elif msg == "end_image":
+        #     print("End sending image")
             
         else:
             pass
@@ -218,7 +204,7 @@ class Vibot:
         """
         while True:
             self.publish("/iot_device/heartbeat", "heartbeat")
-            print("vibot: heartbeat sent")
+            logging.info("vibot: heartbeat sent")
             
             #testing code 
             # payload = {"name": "John", "age": 30, "city": "New York"}
@@ -227,16 +213,14 @@ class Vibot:
             
             time.sleep(2)
         
-            
-        
     def on_disconnect(self, client, userdata, rc):
         """
         Callback function called when the client is unexpectedly disconnected from the broker
         """
         if rc != 0:
             if not self.disconnect_flag:
-                print("Unexpected disconnection.")
-                print("Trying reconnection")
+                logging.warning("Unexpected disconnection.")
+                logging.warning("Trying reconnection")
                 self.rc = rc
                 self.connect()
 
@@ -244,7 +228,7 @@ class Vibot:
         """
         Callback function called when an incoming message is received
         """
-        print("iot device obtains the message in iot_device/command")
+        print(f"iot device received a message from {msg.topic}")
         self.msg_process(msg)
 
     # def unsubscribe(self):

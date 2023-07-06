@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import paho.mqtt.client as mqtt
 import time
+import logging
 
 class Bridge:
     def __init__(self, mqtt_topic, client_id="bridge", user_id="", password="", 
@@ -8,6 +9,8 @@ class Bridge:
         """
         Constructor method for the bridge class
         :param mqtt_topic: The topic to publish/subscribe to
+        Most case we foucs on one topic to publish/subscribe to.
+        If we want to focus on some specific topic, we have to specify the topic in the methods of publish and subscribe. 
         :param client_id: The ID of the client
         :param user_id: The user ID for the broker
         :param password: The password for the broker
@@ -48,23 +51,27 @@ class Bridge:
         """
         while self.rc != 0:
             try:
-                print(f":D trying to reconnect to the broker on {self.host}")
                 self.rc = self.client.connect(self.host, self.port, self.keepalive)
-            except:
+            except Exception as e:
                 # If the connection fails, wait for 2 seconds before trying again
-                print("---")
-                print("Oops... Connection failed, and here list some potential issues FYI")
-                print("1. Check the WIFI connection. Make sure the port num is an integer. ")
+                # If the connection fails, log the error and wait for some time before trying again.
+                logging.error(f"Failed to connect to MQTT broker: {e}")
+                logging.info("Waiting for 2 seconds before retrying...")
+                time.sleep(2)
+                self.timeout += 2
+                
+                # Print some suggestions for potential soluations
+                print("---\nSuggestions: ")
+                print("1. Check the WIFI connection. Make sure the port num in the code is an integer instead of a string. ")
                 print("2. Check the MQTT version in the cloud. You might encounter local loopback monitoring issue in mosquitto 2 and higher. (I encountered it in Aliyun). "
-                      +"\n You can downgrade MQTT to 1.6 stable or configure mosquitto.conf as appropriate.")
-                print(f"3. Check MQTT return code(rc), which currently is {self.rc} \n ---")
-            time.sleep(1)
-            self.timeout += 2
+                      +"\n You may downgrade MQTT to 1.6 stable or configure mosquitto.conf as appropriate.")
+                print(f"3. Check MQTT return code(rc), which currently is {self.rc} \n---")
 
     def msg_process(self, msg):
         """
         Process incoming MQTT messages
         """
+        # TODO: you can inherit this class and focus on coding in this method
         pass
 
     def looping(self, loop_timeout=60):
@@ -78,12 +85,17 @@ class Bridge:
         """
         Callback function called when the client successfully connects to the broker
         """
-        print(f"Connected to MQTT broker with result code {str(rc)}")
+        logging.info(f"Connected to MQTT broker with result code {str(rc)}")
         self.client.subscribe(self.mqtt_topic)
-        
         self.timeout = 0
         
-    def subscribe(self, topic):
+    def subscribe(self, topic=None):
+        """
+        Subscribe to a topic. 
+        :param topic: The topic to subscribe to.Optional, defaults to the topic passed in the constructor method.
+        """
+        if topic is None:
+            topic == self.mqtt_topic
         self.client.subscribe(topic)
         
     def on_disconnect(self, client, userdata, rc):
@@ -92,8 +104,8 @@ class Bridge:
         """
         if rc != 0:
             if not self.disconnect_flag:
-                print("Unexpected disconnection.")
-                print("Trying reconnection")
+                logging.warning("Unexpected disconnection.")
+                logging.warning("Trying reconnection")
                 self.rc = rc
                 self.connect()
 
@@ -104,59 +116,47 @@ class Bridge:
         self.msg_process(msg)
 
 
-
     def unsubscribe(self, topic=None):
         """
-        Unsubscribe from the MQTT topic
+        Unsubscribe from the MQTT topic. Optional, defaults to the topic passed in the constructor method.
         """
-        if topic == None:
+        if topic is None:
             topic = self.mqtt_topic
-        print(f"Unsubscribing {topic}")
+        logging.info(f"Unsubscribing {topic}")
         self.client.unsubscribe(topic)
-        
+        logging.info(f"Unsubscribed {topic}")
         
     def disconnect(self):
         """
         Disconnect from the MQTT broker
         """
-        print("Disconnecting")
+        logging.info("Disconnecting from MQTT broker...")
         self.disconnect_flag = True
         self.client.disconnect()
+        logging.info("Disconnected from MQTT broker...")
 
     def on_unsubscribe(self, client, userdata, mid):
         """
         Callback function called when the client successfully unsubscribes from a topic
         """
-        # if self.mqtt_topic == "#":
-        #     print("Unsubscribed from all topics")
-        # else:
-        #     print(f"Unsubscribed from {self.mqtt_topic}")
-        print("Unsubscribed!")
+        logging.info(f"Unsubscribed from topic with message id {str(mid)}")
 
     def on_subscribe(self, client, userdata, mid, granted_qos):
         """
         Callback function called when the client successfully subscribes to a topic
         """
-        if self.mqtt_topic == "#":
-            print("Subscribed to all topics")
-        else:
-            print(f"Subscribed to {self.mqtt_topic}")
+        logging.info(f"Subscribed to topic with message id {str(mid)} and QoS {str(granted_qos)}")
     
-    # def publish(self, message, qos=0):
-    #     """
-    #     Publish a message to the MQTT broker
-    #     :param message: The message to publish
-    #     """
-    #     self.client.publish(self.mqtt_topic, message, qos)
-    
-    def publish(self, topic, message="testing", qos=0):
+    def publish(self, topic=None, message=None, qos=0):
         """
         Publish a message to the MQTT broker
         :param message: The message to publish
         """
         if topic is None:
             topic = self.mqtt_topic
-        print(f"Publishing the message ('{message}') to topic {topic}")
+        if message is None:
+            message = "Warning: You have not specified the message to publish. Check out the Bridge class!"
+        logging.info(f"Publishing messagethe message ('{message}') to topic {topic}")
         self.client.publish(topic, message, qos)
         
     def hook(self):
@@ -165,7 +165,7 @@ class Bridge:
         """
         self.unsubscribe()
         self.disconnect()
-        print("Shutting down")
+        logging.info("Shutting down...")
 
     def get_timeout(self):
         """

@@ -7,7 +7,7 @@ from sensor_msgs.msg import Image
 import rospy
 import threading
 import os
-import cv2
+import logging
 import json
 import config as CONFIG
 import iot_status_checker as isc
@@ -20,17 +20,6 @@ class DeviceCommander(Bridge):
     def __init__(self, client_id = "commander", 
                  user_id="", password="", 
                  host="localhost", port=1883, keepalive=60, qos=0):
-        """
-        Constructor method for the ToMqttBridge class
-        :param client_id: The ID of the client
-        :param user_id: The user ID for the broker
-        :param password: The password for the broker
-        :param host: The hostname or IP address of the broker
-        :param port: The port number of the broker
-        :param keepalive: The keepalive interval for the client
-        :param qos: The Quality of Service that determines the level of guarantee 
-        for message delivery between MQTT client and broker. 
-        """
 
         self.DATA_TOPISCS = {"point_cloud": "/data/point_cloud",
                              "image": "/data/img"}
@@ -60,10 +49,11 @@ class DeviceCommander(Bridge):
         """
         Callback function called when the client successfully connects to the broker
         """
-        print(f"Connected to MQTT broker with result code {str(rc)}")
+        logging.info(f"Connected to MQTT broker with result code {str(rc)}")
         
         # Set the connected (to MQTT broker) flag to true.
         self.connected = True
+        self.timeout = 0
         # Subscribed to the command respomse topic
         self.subscribe(self.COMMAND_RESPONSE)
  
@@ -151,26 +141,26 @@ class DeviceCommander(Bridge):
         try:
             print("Received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
             
-            # code for saving the image data in the folder. 
-            image_msg = Image()
-            image_msg.deserialize(msg.payload)
+            # TODO: code for saving the image data in the folder. 
+            # image_msg = Image()
+            # image_msg.deserialize(msg.payload)
             
-            # Convert the Image message to numpy array
-            image_np = cv2.imdecode(np.fromstring(image_msg.data, np.uint8), cv2.IMREAD_COLOR)
+            # # Convert the Image message to numpy array
+            # image_np = cv2.imdecode(np.fromstring(image_msg.data, np.uint8), cv2.IMREAD_COLOR)
                         
-            # Generate a unique filename based on the timestamp
-            filename = str(time.time()) + ".jpg"
+            # # Generate a unique filename based on the timestamp
+            # filename = str(time.time()) + ".jpg"
 
-            # Get the path to the img_data folder
-            folder_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "img_data")
+            # # Get the path to the img_data folder
+            # folder_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "img_data")
 
-            # Create the img_data folder if it doesn't exist
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
+            # # Create the img_data folder if it doesn't exist
+            # if not os.path.exists(folder_path):
+            #     os.makedirs(folder_path)
 
-            # Write the image data to a file in the img_data folder
-            file_path = os.path.join(folder_path, filename)
-            cv2.imwrite(file_path, image_np)
+            # # Write the image data to a file in the img_data folder
+            # file_path = os.path.join(folder_path, filename)
+            # cv2.imwrite(file_path, image_np)
 
         except Exception as e:
             pass
@@ -236,7 +226,7 @@ class DeviceCommander(Bridge):
         # Wait for 10 seconds and see if we can subscribe to message from topic RESPONSE
         
         self.publish(self.COMMAND, "enable_vio_service")
-        time.sleep(3)
+        time.sleep(2)
         if self.vio_enabled:
             print("Successfully enabled vio service")
         else:
@@ -257,7 +247,7 @@ class DeviceCommander(Bridge):
         # Wait for 10 seconds and see if we can subscribe to message from topic RESPONSE
         
         self.publish(self.COMMAND, "disable_vio_service")
-        time.sleep(3)
+        time.sleep(2)
         if not self.vio_enabled:
             print("Successfully disabled vio service")
         else:
