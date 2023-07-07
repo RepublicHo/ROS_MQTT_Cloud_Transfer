@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import paho.mqtt.client as mqtt
 import threading
 import json
@@ -5,78 +7,51 @@ import requests
 import time
 import rospy
 import numpy as np
+from bridge import Bridge
 from sensor_msgs.msg import PointCloud
 from sensor_msgs.msg import Image
 from point_cloud_forwarder import PointCloudForwarder
 from image_forwarder import ImageForwarder
 import logging
 
-class Vibot:
-    def __init__(self, status_check_topic = "/iot_device/status_check", command_topic = "/iot_device/command",
-                 client_id="device", user_id="", password="", 
-                 host="43.133.159.102", port=1883, keepalive=60, qos=0):
+class Vibot(Bridge):
+    def __init__(
+        self, 
+        mqtt_topic,
+        client_id="vibot_device", 
+        user_id="", 
+        password="", 
+        host="43.133.159.102", 
+        port=1883, 
+        keepalive=60, 
+        qos=0
+    ):
        
-        self.status_check_topic = status_check_topic
-        self.command_topic = command_topic
-        self.client_id = client_id
-        self.user_id = user_id
-        self.password = password
-        self.host = host
-        self.port = port
-        self.keepalive = keepalive
-        self.qos = qos
+        self.status_check_topic = "/iot_device/status_check"
+        self.command_topic = "/iot_device/command"
+        self.response_topic = "/iot_device/command_response"
         
-        self.disconnect_flag = False
-        self.rc = 1
-        self.timeout = 0
-
-        # Create the MQTT client object, set the username and password, and register the callback functions
-        self.client = mqtt.Client(self.client_id, clean_session=True)
-        self.client.username_pw_set(self.user_id, self.password)
-        self.client.on_connect = self.on_connect
-        self.client.on_disconnect = self.on_disconnect
-        self.client.on_message = self.on_message
+        self.enable_vio_algorithm_url = 'http://localhost:8000/Smart/algorithmEnable'
 
         # Initialize the ROS forwarder node, which can
-        # 1. Subscribe to a topic in ROS
-        # 2. Immediately publish a point cloud message to the MQTT topic
+        # 1. Subscribe to a topic in ROS. 
+        # 2. Immediately publish the message received to the MQTT topic in the cloud. 
+        # Currently it can merely forward two types of message, 
+        # as seen in point_cloud_forwarder.py and image_forwarder.py
         rospy.init_node("forwarder", anonymous=True)
         
-        # Connect to the broker
-        self.connect()
-
-    def connect(self):
-        """
-        Connect to the MQTT broker
-        """
-        while self.rc != 0:
-            try:
-                self.rc = self.client.connect(self.host, self.port, self.keepalive)
-            except Exception as e:
-                # If the connection fails, wait for 2 seconds before trying again
-                # If the connection fails, log the error and wait for some time before trying again.
-                logging.error(f"Failed to connect to MQTT broker: {e}")
-                logging.info("Waiting for 2 seconds before retrying...")
-                time.sleep(2)
-                self.timeout += 2
-                
-                # Print some suggestions for potential soluations
-                print("---\nSuggestions: ")
-                print("1. Check the WIFI connection. Make sure the port num in the code is an integer instead of a string. ")
-                print("2. Check the MQTT version in the cloud. You might encounter local loopback monitoring issue in mosquitto 2 and higher. (I encountered it in Aliyun). "
-                      +"\n You may downgrade MQTT to 1.6 stable or configure mosquitto.conf as appropriate.")
-                print(f"3. Check MQTT return code(rc), which currently is {self.rc} \n---")
-
-    def disconnect(self):
-        """
-        Disconnect from the MQTT broker
-        """
-        logging.info("Disconnecting from MQTT broker...")
-        self.disconnect_flag = True
-        self.client.disconnect()
-        logging.info("Disconnected from MQTT broker...")
+        # Logging configuration
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        
+        # We take the command topic as default mqtt topic. 
+        super().__init__(self.command_topic, client_id, user_id, password, host, port, keepalive, qos)
     
-
     def point_cloud_transfer(self):
         
         # Create an instance of the forwarder class
@@ -96,40 +71,38 @@ class Vibot:
         
     def msg_process(self, msg):
         """
-        Process incoming MQTT messages
+        Process incoming MQTT messages from topic "/iot_device/command"
         """
-        print("processing message")
+        msg_topic = msg.topic
         msg = str(msg.payload.decode())
+        self.logger.debug(f"Processing message {msg} from topic {msg_topic}")
+        
         if msg == "status_check":
+            # This message is used to verify the status of the IoT device. 
+            # The current implementation involves the following steps:
+            # 1. The host sends a string "status_check" to the IoT device via the MQTT broker.
+            # 2. The device sends a string "status_ok" to the host via the broker to indicate that it is online and responsive.
+            # 
+            # TODO: To enhance the security of this verification process, additional authentication and authorization mechanisms 
+            # could be implemented to ensure that only authorized hosts can send the "status_check" message, 
+            # and only authorized devices can respond with the "status_ok" message.
             self.publish("/iot_device/status_response", "status_ok")
-            print("sent to /iot_device/status_response")
+            self.logger.debug("Sent status_ok to /iot_device/status_response")
         
         elif msg == "enable_vio_service":
-            
-            url = 'http://localhost:8000/Smart/algorithmEnable'
-
-            # Define the data to update the resource with
-            data = {'name': 'John Smith', 'age': 35}
-
-            # Encode the data as JSON
-            # json_data = json.dumps(data)
-
-            # Define the headers for the request
-            # headers = {'Content-type': 'application/json'}
 
             # Make the HTTP PUT request
-            response = requests.put(url)
-            # print(response)
+            http_response = requests.put(self.enable_vio_algorithm_url)
+
             # Check the response status code
-            if response.status_code == 200:
-                    
-                    print('Vio algorithm enabled\n')
+            if http_response.status_code == 200: 
+                self.logger.info('Vio algorithm enabled\n')
             else:
-                    print('Failed to enable vio algorithm, please enable it manually\n')
+                self.logger.warning('Failed to enable vio algorithm, please enable it manually\n')
             
-            message = {'type': 'enable_vio', 'code': response.status_code}
+            message = {'type': 'enable_vio', 'code': http_response.status_code}
             json_message = json.dumps(message)
-            self.publish("/iot_device/command_response", json_message)
+            self.publish(self.response_topic, json_message)
         
         elif msg == "disable_vio_service":
             
@@ -144,7 +117,7 @@ class Vibot:
             
             message = {'type': 'disable_vio', 'code': response.status_code}
             json_message = json.dumps(message)
-            self.publish("/iot_device/command_response", json_message)
+            self.publish(self.response_topic, json_message)
                         
         elif msg == "point_cloud":
             message = {'type': 'point_cloud_transfer', 'code': 200}
@@ -276,11 +249,9 @@ class Vibot:
 if __name__ == "__main__":
     
     # Set up MQTT client and callbacks
-    sn = Vibot()
+    sn = Vibot(mqtt_topic=)
     sn.looping()
     
-    # Continuously publish device status every 5 seconds
 
-    # Stop MQTT client loop and disconnect from broker
     
 

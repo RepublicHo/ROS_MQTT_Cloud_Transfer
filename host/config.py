@@ -5,7 +5,7 @@ settings or constants that are used throughout an application.
 
 class APP:
     APPLICATION = "Vibot Commander"
-    AUTHOR = "Zhe-Jun HE"
+    AUTHOR = "C. HK"
     VERSION = "V1.0"
 
 class CONNECTION:
