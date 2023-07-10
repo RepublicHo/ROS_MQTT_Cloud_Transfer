@@ -5,7 +5,7 @@
 This project is to establish bidirectional communication between the local host and the IoT device using an MQTT bridge. For the IoT device we use, it is integrated with the ROS system and features a camera that can capture both point cloud and image data. By enabling the algorithm, the device can process this data and publish it to the local ROS topic. This device can also transmit data over a network. Due to the unknown public IPs of both the IoT device and the local host, as well as the large amount of data to be transferred and the unstable networking circumstances, we opted to to use the MQTT protocol to facilitate their long-range data transfer.
 
 ## Architecture Diagram
-
+![Alt text](<Blank board - Page 1.jpeg>)
 
 ## Getting Started
 
