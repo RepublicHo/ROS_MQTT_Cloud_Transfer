@@ -10,6 +10,12 @@ from bridge import Bridge
 
 
 class PointCloudForwarder(Bridge):
+    # Define class constants for magic numbers
+    DEFAULT_QOS = 0
+    DEFAULT_KEEPALIVE = 60
+    DEFAULT_EXIT_ON_COMPLETE = True
+    DEFAULT_ENABLE_LOGGING = True
+    
     def __init__(
         self,
         mqtt_topic,
@@ -19,26 +25,13 @@ class PointCloudForwarder(Bridge):
         password="",
         host="localhost",
         port=1883,
-        keepalive=60,
-        qos=0,
-        exit_on_complete=True,
-        enable_logging=True,
+        keepalive=DEFAULT_KEEPALIVE,
+        qos=DEFAULT_QOS,
+        exit_on_complete=DEFAULT_EXIT_ON_COMPLETE,
+        enable_logging=DEFAULT_ENABLE_LOGGING
     ):
-        """
-        Constructor method
-        :param mqtt_topic: The topic to publish to (must not contain wildcards)
-        :param client_id: The ID of the client
-        :param user_id: The user ID for the broker
-        :param password: The password for the broker
-        :param host: The hostname or IP address of the broker
-        :param port: The port number of the broker
-        :param keepalive: The keepalive interval for the client
-        :param qos: The Quality of Service that determines the level of guarantee
-        for message delivery between MQTT client and broker.
-        """
-        if "#" in mqtt_topic or "+" in mqtt_topic:
-            raise ValueError("Publish topic cannot contain wildcards")
 
+        
         # Subscribe to the ROS topic
         self.sub = rospy.Subscriber("/PR_BE/point_cloud", PointCloud, self.pc_callback)
 
@@ -47,13 +40,22 @@ class PointCloudForwarder(Bridge):
         self.exit_on_complete = exit_on_complete
 
         if enable_logging:
+            # Configure logging to both console and file
             self.logger = logging.getLogger(__name__)
             self.logger.setLevel(logging.INFO)
-            handler = logging.StreamHandler()
-            handler.setLevel(logging.INFO)
             formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
+
+            # Add console handler
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            console_handler.setFormatter(formatter)
+            self.logger.addHandler(console_handler)
+
+            # Add file handler
+            file_handler = logging.FileHandler("point_cloud_forwarder.log")
+            file_handler.setLevel(logging.INFO)
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
 
         super().__init__(mqtt_topic, client_id, user_id, password, host, port, keepalive, qos)
 

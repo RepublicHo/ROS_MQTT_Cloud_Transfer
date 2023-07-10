@@ -3,45 +3,81 @@ import numpy as np
 import time
 import sys
 import queue
+import datetime
 from sensor_msgs.msg import Image
 import rospy
 import threading
 import os
+import struct
 import logging
 import json
+import binascii
 import config as CONFIG
 import iot_status_checker as isc
 
+
 from bridge import Bridge
 
+# Yes, there are more advanced systems that can be used to stop the data transfer in a more graceful and efficient way. Here are some examples:
+
+# 应该用这个 Use a dedicated command topic: Instead of waiting for user input on the terminal, you can create a dedicated MQTT topic for sending control commands to the IoT device. The device can listen to this topic and stop the data transfer when it receives a stop command. This approach allows the user to stop the data transfer from any device that has access to the MQTT broker, not just the device running the program.
+
+# Use a watchdog timer: A watchdog timer is a hardware or software timer that is used to detect and recover from errors in a system. In this case, you can use a software watchdog timer to monitor the data transfer and reset the timer periodically. If the timer expires without being reset, it indicates that the data transfer has stopped, and the device can stop the transfer gracefully.
+
+# Use a state machine: A state machine is a mathematical model that describes the behavior of a system. In this case, you can use a state machine to model the data transfer process and the control commands. The device can transition between different states based on the control commands and the status of the data transfer. This approach allows for more complex control logic and error handling.
 
 class DeviceCommander(Bridge):
     
-    def __init__(self, client_id = "commander", 
-                 user_id="", password="", 
-                 host="localhost", port=1883, keepalive=60, qos=0):
+    def __init__(
+            self, 
+            client_id = "commander", 
+            user_id="", 
+            password="", 
+            host="localhost", 
+            port=1883, 
+            keepalive=60, 
+            qos=0
+    ):
 
+        # topics in the mqtt broker 
         self.DATA_TOPISCS = {"point_cloud": "/data/point_cloud",
                              "image": "/data/img"}
 
-        self.lock = threading.Lock()
-        
         # connected is used for checking if the host can connected to the MQTT broker
+        # TODO: if lose connection, set it to false and reconnect once again. 
         self.connected = False
-        
-        self.user_input_queue = queue.Queue()
-        
-        self.status = 0 # 0 for not connected, 1 for connected, 2 for timeout or other bugs
-        self.last_heartbeat_time = time.time()
         
         # constants for brokers
         self.DEVICE_HEARTBEAT = "/iot_device/heartbeat"
         self.COMMAND = "/iot_device/command"
         self.COMMAND_RESPONSE = "/iot_device/command_response"
-        self.HEARTBEAT_TIMEOUT = 30 # seconds
         
+        # Configure logging to both console and file
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+        # Add console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+
+        # Add file handler
+        file_handler = logging.FileHandler("device_commander.log")
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+        
+        # TODO: Not yet used. 
+        self.lock = threading.Lock()
+        self.user_input_queue = queue.Queue()
+        self.status = 0 # 0 for not connected, 1 for connected, 2 for timeout or other bugs
+        self.last_heartbeat_time = time.time()
+        self.HEARTBEAT_TIMEOUT = 30 # seconds
         self.vio_enabled = False
         
+
         super().__init__(self.COMMAND_RESPONSE, client_id, user_id, 
                          password, host, port, keepalive, qos)
     
@@ -51,40 +87,44 @@ class DeviceCommander(Bridge):
         """
         logging.info(f"Connected to MQTT broker with result code {str(rc)}")
         
+        # Subscribed to the command respomse topic
+        self.subscribe(self.COMMAND_RESPONSE)
+        
         # Set the connected (to MQTT broker) flag to true.
         self.connected = True
         self.timeout = 0
-        # Subscribed to the command respomse topic
-        self.subscribe(self.COMMAND_RESPONSE)
+        
  
     # Define the function to handle incoming messages
     def on_message(self, client, userdata, msg):
-        # Decode the base64-encoded message payload
+        
+        # testing code： Decode the base64-encoded message payload
         # data = base64.b64decode(msg.payload)
-        # testing code
         # print("msg: " + msg)
         # print("data: " + data)
         
         # testing code
         if msg.topic != self.DEVICE_HEARTBEAT:
-            print("Commander received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
+            self.logger.info("Commander received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
+        
         
         if msg.topic == self.DEVICE_HEARTBEAT:
             self.last_heartbeat_time = time.time()
-            # print("updated last_heartbeat", self.last_heartbeat_time)
-            # print(1)
+            
+            # test code: print message when it hearts the heartbeat. 
+            print("Heartbeat received, updated last_heartbeat", self.last_heartbeat_time)    
         elif msg.topic == self.DATA_TOPISCS["point_cloud"]:
             self.process_point_cloud(msg)
         
         elif msg.topic == self.DATA_TOPISCS["image"]:
-            
             self.process_image(msg)
             
-        elif self.status == 1:
-            if msg.topic == self.COMMAND_RESPONSE:       
-                self.msg_process(msg)
-            else:
-                print("Oops, timeout!")
+        elif msg.topic == self.COMMAND_RESPONSE:  
+            self.msg_process(msg)
+        
+        else: # If message is from an unknown topic, it serves as a reminder. 
+            self.logger.warning(f"We unexpectedly received a message from {msg.topic} topic")
+            self.logger.warning("This could be a threat! ")
     
     def is_json(self, string):
         try:
@@ -94,11 +134,14 @@ class DeviceCommander(Bridge):
         return True
     
     def msg_process(self, msg):
+        '''
+        TODO: You can add more functionality here if needed. 
+        '''
         
         if self.is_json(msg.payload.decode()):
             # Decode the message payload from JSON format
             json_msg = json.loads(msg.payload.decode())
-            print("Received message: ", json_msg)
+            self.logger.info("Received JSON message: ", json_msg)
             
             if json_msg['type'] == "enable_vio" and json_msg['code'] == 200:
                 self.vio_enabled = True
@@ -109,33 +152,57 @@ class DeviceCommander(Bridge):
             elif json_msg['type'] == "image_transfer" and json_msg['code'] == 200:
                 self.subscribe(topic=self.DATA_TOPISCS["image"])
         
-        # Handle the data based on the topic and its type
-        # if msg.topic == self.DATA_TOPISCS[""]:
-        #     pass
-        #     print("->point cloud received!")
-        #     self.process_pointcloud(msg)
-        # elif msg.topic == self.DATA_TOPISCS["image"]:
-        #     print("->image received!")
-        #     self.process_image(data)
-        # else:
-        #     print("->Exception occurs!")
+            # TODO: 完善停止传输
+            elif json_msg['type'] == "stop_point_cloud_transfer" and json_msg['code'] == 200:
+                self.unsubscribe(topic=self.DATA_TOPISCS["point_cloud"])
+            elif json_msg['type'] == "stop_image_transfer" and json_msg['code'] == 200:
+                self.unsubscribe(topic=self.DATA_TOPISCS["image"])
+            
+            else:
+                self.logger.warning(f"A JSON message {json_msg['type']} with code {json_msg['code']} is received unexpectedly!")
+        else:
+            self.logger.warning("An invalid JSON message is received! Please check!")
       
         
     def process_point_cloud(self, msg):
         """
         Function to process the point cloud data received from the IoT device
-        TODO: properly save/visualize the point cloud data. 
+        TODO: properly save/visualize the point cloud data as appropriate.
+         
         """
         try:
-            print("Received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
-        except Exception as e:
-            pass
-        # Unpack the binary message into a list of floats
-        # point_clouds_flat = struct.unpack('<%sf' % (len(msg.payload) // 4), msg.payload)
+            self.logger.debug("Received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
+            
+            # Decode the hexadecimal message to a binary string
+            binary_msg = binascii.unhexlify(msg)
 
-        # # Convert the list of floats to a list of tuples representing points
-        # point_clouds = [(point_clouds_flat[i], point_clouds_flat[i+1], point_clouds_flat[i+2]) for i in range(0, len(point_clouds_flat), 3)]
-        # print("todo...")
+            # Unpack the binary string to a list of floats
+            num_floats = len(binary_msg) // 4  # Each float is 4 bytes
+            float_list = struct.unpack("<%sf" % num_floats, binary_msg)
+
+            # Reshape the list of floats to a list of tuples representing the point cloud
+            point_clouds = [(float_list[i], float_list[i+1], float_list[i+2]) for i in range(0, num_floats, 3)]
+            
+            # Save the cloud_points_flat data to a file with an index and the current date and time in the filename
+            now = datetime.datetime.now()
+            date_time_string = now.strftime("%Y-%m-%d_%H-%M-%S-%f")
+            filename = f'cloud_sub_{date_time_string}.ply'
+            foldername = 'point_cloud_sets'
+            if not os.path.exists(foldername):
+                os.mkdir(foldername)
+                
+            filepath = os.path.join(foldername, filename)
+            with open(filepath, 'w') as f:
+                f.write(f'ply\nformat ascii 1.0\nelement vertex {len(point_clouds)}\nproperty float x\nproperty float y\nproperty float z\nend_header\n')
+                for point in point_clouds:
+                    f.write(f'{point[0]} {point[1]} {point[2]}\n')
+        
+        except TypeError as e:
+            self.logger.error("Type error occurs when processing point cloud: {}".format(e))
+        
+        except Exception as e:
+            self.logger.error("Error occurs when processing point cloud: {}".format(e))
+            
     
     def process_image(self, msg):
         """
@@ -145,30 +212,9 @@ class DeviceCommander(Bridge):
         try:
             print("Received message on topic " + msg.topic + " with payload size " + str(len(msg.payload)))
             
-            # TODO: code for saving the image data in the folder. 
-            # image_msg = Image()
-            # image_msg.deserialize(msg.payload)
-            
-            # # Convert the Image message to numpy array
-            # image_np = cv2.imdecode(np.fromstring(image_msg.data, np.uint8), cv2.IMREAD_COLOR)
-                        
-            # # Generate a unique filename based on the timestamp
-            # filename = str(time.time()) + ".jpg"
-
-            # # Get the path to the img_data folder
-            # folder_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "img_data")
-
-            # # Create the img_data folder if it doesn't exist
-            # if not os.path.exists(folder_path):
-            #     os.makedirs(folder_path)
-
-            # # Write the image data to a file in the img_data folder
-            # file_path = os.path.join(folder_path, filename)
-            # cv2.imwrite(file_path, image_np)
-
         except Exception as e:
-            print("error")
-            pass
+            self.logger.error("Error occurs when processing point cloud: {}".format(e))
+
 
     
     def send_commands(self, value):
@@ -248,9 +294,7 @@ class DeviceCommander(Bridge):
     # Define the function to disable the vio capturing algorithm
     def disable_vio_algorithm(self):
         
-        
         # Wait for 10 seconds and see if we can subscribe to message from topic RESPONSE
-        
         self.publish(self.COMMAND, "disable_vio_service")
         time.sleep(2)
         if not self.vio_enabled:
@@ -325,8 +369,10 @@ class DeviceCommander(Bridge):
             menu_options = [
                 {"name": "Enable Vio algorithm Service", "value": 1},
                 {"name": "Disable Vio algorithm Service", "value": 2},
-                {"name": "Obtain Point Cloud", "value": 3},
-                {"name": "Obtain Image", "value": 4},
+                {"name": "Start transferring Point Cloud", "value": 3},
+                {"name": "Start transferring Image", "value": 4},
+                {"name": "End transferring Point Cloud", "value": 5},
+                {"name": "End transferring Image", "value": 6},
                 {"name": "Exit", "value": 0}
             ]
                 
@@ -362,25 +408,34 @@ class DeviceCommander(Bridge):
                 choice = input("Enter your choice: ")
                 # Handle the user's choice
                 if choice == "0":
+                    self.status = 0
                     print("Exiting...")
                     break
+                
                 elif choice == "1":
                     self.enable_vio_algorithm()
+                    
                 elif choice == "2":
                     self.disable_vio_algorithm()
+                    
                 elif choice == "3":
                     self.subscribe(self.DATA_TOPISCS["point_cloud"])
-                    self.publish(self.COMMAND, "point_cloud")
+                    self.publish(self.COMMAND, "start_point_cloud_transfer")
                     time.sleep(30)
                     
                 elif choice == "4":
                     self.subscribe(self.DATA_TOPISCS["image"])
-                    self.publish(self.COMMAND, "image")
+                    self.publish(self.COMMAND, "start_image_transfer")
                     
                     
-            #     elif choice.isdigit() and int(choice) in [option["value"] for option in menu_options]:
-            #         chosen_option = [option for option in menu_options if option["value"] == int(choice)][0]
-            #         print(f"You chose {chosen_option['name']}.")
+                elif choice == "5":
+                    self.unsubscribe(self.DATA_TOPISCS["point_cloud"])
+                    self.publish(self.COMMAND, "end_point_cloud_transfer")
+                    time.sleep(30)
+                    
+                elif choice == "6":
+                    self.unsubscribe(self.DATA_TOPISCS["image"])
+                    self.publish(self.COMMAND, "end_image_transfer")
                     
                 else:
                     if self.status == 1:

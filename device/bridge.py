@@ -20,6 +20,16 @@ class Bridge:
         :param qos: The Quality of Service that determines the level of guarantee 
         for message delivery between MQTT client and broker. 
         """
+        # Validate user inputs
+        if "#" in mqtt_topic or "+" in mqtt_topic:
+            raise ValueError("Publish topic cannot contain wildcards")
+        if qos not in [0, 1, 2]:
+            raise ValueError("QoS level must be 0, 1, or 2")
+        if keepalive <= 0:
+            raise ValueError("Keepalive interval must be a positive integer")
+        if not isinstance(port, int):
+            raise ValueError("Port must be an integer!")
+        
         self.mqtt_topic = mqtt_topic
         self.client_id = client_id
         self.user_id = user_id

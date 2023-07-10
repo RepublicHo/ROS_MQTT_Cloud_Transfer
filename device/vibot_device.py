@@ -40,14 +40,23 @@ class Vibot(Bridge):
         # as seen in point_cloud_forwarder.py and image_forwarder.py
         rospy.init_node("forwarder", anonymous=True)
         
-        # Logging configuration
+
+        # Configure logging to both console and file
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
-        handler = logging.StreamHandler()
-        handler.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.INFO)
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+
+        # Add console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+
+        # Add file handler
+        file_handler = logging.FileHandler("vibot_device.log")
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
         
         # We take the command topic as default mqtt topic. 
         super().__init__(self.command_topic, client_id, user_id, password, host, port, keepalive, qos)
@@ -119,7 +128,7 @@ class Vibot(Bridge):
             json_message = json.dumps(message)
             self.publish(self.response_topic, json_message)
                         
-        elif msg == "point_cloud":
+        elif msg == "start_point_cloud_transfer":
             message = {'type': 'point_cloud_transfer', 'code': 200}
             json_message = json.dumps(message)
             self.publish("/iot_device/command_response", message=json_message)
@@ -130,10 +139,10 @@ class Vibot(Bridge):
             except rospy.ROSInterruptException:
                 pass
             
-        # elif msg == "end_point_cloud":
-        #     print("End sending point cloud")
+        elif msg == "end_point_cloud_transfer":
+            print("End sending point cloud")
             
-        elif msg == "image":
+        elif msg == "start_image_transfer":
             message = {'type': 'image_transfer', 'code': 200}
             json_message = json.dumps(message)
             self.publish("iot_device/command_response", message=json_message)
@@ -144,10 +153,11 @@ class Vibot(Bridge):
             except rospy.ROSInterruptException:
                 pass
             
-        # elif msg == "end_image":
-        #     print("End sending image")
+        elif msg == "end_image_transfer":
+            print("End sending image")
             
         else:
+            self.logger.warning(f"Received unknown message: {msg} ")
             pass
         
 

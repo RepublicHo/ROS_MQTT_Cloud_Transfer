@@ -7,49 +7,57 @@ from bridge import Bridge
 
 
 class ImageForwarder(Bridge):
+    # Define class constants for magic numbers
+    DEFAULT_PACKET_SIZE = 1024
+    DEFAULT_QOS = 0
+    DEFAULT_KEEPALIVE = 60
+    DEFAULT_EXIT_ON_COMPLETE = True
+    DEFAULT_ENABLE_LOGGING = True
+    
     def __init__(
         self,
         mqtt_topic,
         client_id="image_forwarder",
-        packet_size=1024,
+        packet_size=DEFAULT_PACKET_SIZE,
         user_id="",
         password="",
         host="localhost",
         port=1883,
-        keepalive=60,
-        qos=0,
-        exit_on_complete=True,
-        enable_logging=True,
+        keepalive=DEFAULT_KEEPALIVE,
+        qos=DEFAULT_QOS,
+        exit_on_complete=DEFAULT_EXIT_ON_COMPLETE,
+        enable_logging=DEFAULT_ENABLE_LOGGING,
     ):
-        """
-        Constructor method
-        :param mqtt_topic: The topic to publish/subscribe to
-        :param client_id: The ID of the client
-        :param packet_size: The maximum size of each packet in bytes
-        :param user_id: The user ID for the broker
-        :param password: The password for the broker
-        :param host: The hostname or IP address of the broker
-        :param port: The port number of the broker
-        :param keepalive: The keepalive interval for the client
-        :param qos: The Quality of Service that determines the level of guarantee
-        for message delivery between MQTT client and broker.
-        """
-
+        
+        # Validate user inputs
+        if packet_size <= 0:
+            raise ValueError("Packet size must be a positive integer")
+        
         # Subscribe to the ROS topic
         self.sub = rospy.Subscriber("/PR_FE/feature_img", Image, self.image_callback)
 
         self.packet_size = packet_size
         self.num_packets_forwarded = 0
+        self.num_image_forwarded = 0
         self.exit_on_complete = exit_on_complete
 
         if enable_logging:
+            # Configure logging to both console and file
             self.logger = logging.getLogger(__name__)
             self.logger.setLevel(logging.INFO)
-            handler = logging.StreamHandler()
-            handler.setLevel(logging.INFO)
             formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
+
+            # Add console handler
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            console_handler.setFormatter(formatter)
+            self.logger.addHandler(console_handler)
+
+            # Add file handler
+            file_handler = logging.FileHandler("image_forwarder.log")
+            file_handler.setLevel(logging.INFO)
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
 
         super().__init__(mqtt_topic, client_id, user_id, password, host, port, keepalive, qos)
 
@@ -60,6 +68,7 @@ class ImageForwarder(Bridge):
 
             # 2. Split the byte array into smaller packets
             num_packets = (len(byte_array) + self.packet_size - 1) // self.packet_size
+            
             for i in range(num_packets):
                 start = i * self.packet_size
                 end = (i + 1) * self.packet_size
@@ -72,6 +81,8 @@ class ImageForwarder(Bridge):
                     )
                 )
 
+            self.logger.info("Forwarded image {} successfully".format(self.num_image_forwarded))
+            
             # Increment the number of packets forwarded
             self.num_packets_forwarded += num_packets
 
