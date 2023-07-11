@@ -126,9 +126,9 @@ class Vibot(Bridge):
             response = requests.put(url)
 
             if response.status_code == 200:
-                    print('Vio algorithm disabled\n')
+                    self.logger.info('Vio algorithm disabled\n')
             else:
-                    print('Failed to enable vio algorithm, please disable it manually\n')
+                    self.logger.info('Failed to enable vio algorithm, please disable it manually\n')
             
             message = {'type': 'disable_vio', 'code': response.status_code}
             json_message = json.dumps(message)
@@ -238,7 +238,9 @@ class Vibot(Bridge):
         """
         while True:
             self.publish("/iot_device/heartbeat", "heartbeat")
-            logging.info("vibot: heartbeat sent")
+            
+            #optional logger
+            #self.logger.info("vibot: heartbeat sent")
             
             #testing code 
             # payload = {"name": "John", "age": 30, "city": "New York"}
@@ -252,8 +254,8 @@ class Vibot(Bridge):
 if __name__ == "__main__":
     
     # Set up MQTT client and callbacks
-    sn = Vibot(mqtt_topic="/iot_device/command")
-    sn.looping()
+    sn = Vibot()
+    sn.client.loop_forever()
     
 
     

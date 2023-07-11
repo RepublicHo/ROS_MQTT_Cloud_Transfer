@@ -75,13 +75,15 @@ class DeviceCommander(Bridge):
         self.logger.addHandler(file_handler)
         
         
+        self.vio_enabled = False
+        
         # TODO: Not yet used. 
         self.lock = threading.Lock()
         self.user_input_queue = queue.Queue()
         self.status = 0 # 0 for not connected, 1 for connected, 2 for timeout or other bugs
         self.last_heartbeat_time = time.time()
         self.HEARTBEAT_TIMEOUT = 30 # seconds
-        self.vio_enabled = False
+        
         
 
         super().__init__(mqtt_topic, client_id, user_id, 
@@ -126,7 +128,7 @@ class DeviceCommander(Bridge):
         if self.is_json(msg.payload.decode()):
             # Decode the message payload from JSON format
             json_msg = json.loads(msg.payload.decode())
-            self.logger.info("Received JSON message: ", json_msg)
+            self.logger.info(f"Received JSON message: type {json_msg['type']} and code {json_msg['code']}")
             
             if json_msg['type'] == "enable_vio" and json_msg['code'] == 200:
                 self.vio_enabled = True
@@ -171,48 +173,38 @@ class DeviceCommander(Bridge):
     
     
     def check_heartbeat(self):
-        while True:
-            # print("last heartbeat: ",  self.last_heartbeat_time, " time now: ", time.time())
-            
-            # Check if the heartbeat timeout has elapsed
-            print("checked last_heartbeat", self.last_heartbeat_time)
-            print(time.time() - self.last_heartbeat_time)
-            if time.time() - self.last_heartbeat_time > self.HEARTBEAT_TIMEOUT:
+        """Checks if the device has received a heartbeat message from the cloud within the specified timeout.
+
+        If the last heartbeat time is older than the heartbeat timeout duration, sets the status to 0 (timeout).
+
+        To stop this function, set the status to a value other than 1.
+        """
+        while self.status == 1:
+            # test code
+            # print(f"time now: {time.time()}, and last_heartbeat_time: {self.last_heartbeat_time}")
+            time_since_last_heartbeat = time.time() - self.last_heartbeat_time
+            if time_since_last_heartbeat > self.HEARTBEAT_TIMEOUT:
                 with self.lock:
-                    self.status = 2 # timeout
-                print("Heartbeat timeout (y for reconnect, n for stopping the program)")
-                user_input = input("Enter your choice (Y/n): ").lower()
-                
-                if user_input == 'y':
-                    self.menu()
-                else:
-                    self.client.loop_stop()
                     self.status = 0
-                    sys.exit()
-                    break
-                
+                    self.logger.warning("Heartbeat timed out")
             time.sleep(1)
-    
+        self.logger.info("Heartbeat check stopped")
 
     
     # Define the function to enable the vio capturing algorithm
     def enable_vio_algorithm(self):
         
-        # Wait for 10 seconds and see if we can subscribe to message from topic RESPONSE
-        
         self.publish(self.COMMAND, "enable_vio_service")
-        time.sleep(2)
-        if self.vio_enabled:
-            self.logger.debug("Successfully enabled vio service")
-        else:
-            self.publish(self.COMMAND, "enable_vio_service")
-            time.sleep(5)
+        timeout = time.time() + 20  # Wait for up to 20 seconds
+
+        while time.time() < timeout:
             if self.vio_enabled:
                 self.logger.debug("Successfully enabled vio service")
+                return "vio algorithm is enabled"
+            time.sleep(1)
 
-            else:
-                self.logger.debug("Failed to enable vio service")
-        
+        self.logger.debug("Failed to enable vio service")
+        return "vio algorithm has trouble being enabled"          
         
         
     # Define the function to disable the vio capturing algorithm
@@ -220,16 +212,16 @@ class DeviceCommander(Bridge):
         
         # Wait for 10 seconds and see if we can subscribe to message from topic RESPONSE
         self.publish(self.COMMAND, "disable_vio_service")
-        time.sleep(2)
-        if not self.vio_enabled:
-            self.logger.debug("Successfully disabled vio service")
-        else:
-            self.publish(self.COMMAND, "disable_vio_service")
-            time.sleep(5)
+        timeout = time.time() + 20  # Wait for up to 20 seconds
+
+        while time.time() < timeout:
             if not self.vio_enabled:
-                self.logger.debugt("Successfully disabled vio service")
-            else:
-                self.logger.debug("Failed to disable vio service")        
+                self.logger.debug("Successfully disabled vio service")
+                return "vio algorithm is disabled"
+            time.sleep(1)
+
+        self.logger.debug("Failed to disable vio service")
+        return "vio algorithm has trouble being disabled"  
     
 
     # define clear
@@ -256,14 +248,15 @@ class DeviceCommander(Bridge):
         
         if self.status == 1:
             
-            self.client.loop_start()
-            
             # Continuously subscribe to heartbeat topic in the cloud.  
             self.subscribe(self.DEVICE_HEARTBEAT)
             
+            
+            self.client.loop_start()
+            
             self.last_heartbeat_time = time.time()
-            # heartbeat_thread = threading.Thread(target=self.check_heartbeat, daemon=True)
-            # heartbeat_thread.start()
+            heartbeat_thread = threading.Thread(target=self.check_heartbeat, daemon=True)
+            heartbeat_thread.start()
             time.sleep(1)
             # network_thread = threading.Thread(self.)
             print(
@@ -287,6 +280,9 @@ class DeviceCommander(Bridge):
                 
             # Display the menu and prompt the user for input
             while self.status == 1:
+                
+                last_command_result = ""
+                
             # Display the menu options
                 print("\n::: Menu :::")
                 for option in menu_options:
@@ -300,33 +296,40 @@ class DeviceCommander(Bridge):
                     break
                 
                 elif choice == "1":
-                    self.enable_vio_algorithm()
+                    last_command_result = self.enable_vio_algorithm()
                     
                 elif choice == "2":
-                    self.disable_vio_algorithm()
+                    last_command_result = self.disable_vio_algorithm()
                     
                 elif choice == "3":
                     # self.subscribe(self.DATA_TOPISCS["point_cloud"])
                     self.publish(self.COMMAND, "start_point_cloud_transfer")
-                    # time.sleep(30)
+                    last_command_result = "point cloud transfer starts. "
                     
                 elif choice == "4":
                     # self.subscribe(self.DATA_TOPISCS["image"])
                     self.publish(self.COMMAND, "start_image_transfer")
-                    
+                    last_command_result = "point cloud transfer ends. "
                     
                 elif choice == "5":
                     # self.unsubscribe(self.DATA_TOPISCS["point_cloud"])
                     self.publish(self.COMMAND, "end_point_cloud_transfer")
-                    # time.sleep(30)
+                    last_command_result = "Image transfer starts."
                     
                 elif choice == "6":
                     # self.unsubscribe(self.DATA_TOPISCS["image"])
                     self.publish(self.COMMAND, "end_image_transfer")
+                    last_command_result = "Point cloud transfer ends. "
                     
                 else:
-                    if self.status == 1:
-                        print("Invalid choice. Please try again.")
+                    last_command_result = "Invalid choice. Please try again."
+
+                        
+                if self.status == 0:
+                    last_command_result = "Detected the device failed to connect to MQTT broker. Please check the device. "
+                    
+                print(last_command_result)
+                
         
         self.client.loop_stop()
     
@@ -342,12 +345,12 @@ def main():
     commander_bridge.menu()
 
 if __name__ == '__main__':
-    # try:
-    main()
-    # except rospy.ROSInterruptException:
-    #     """
-    #     If ROS interrupt exception is raised (e.g., if the user
-    #     presses Ctrl-C to stop the program), the exception is
-    #     caught and ignored. 
-    #     """
-    #     pass
+    try:
+        main()
+    except rospy.ROSInterruptException:
+        """
+         If ROS interrupt exception is raised (e.g., if the user
+         presses Ctrl-C to stop the program), the exception is
+         caught and ignored. 
+        """
+        pass

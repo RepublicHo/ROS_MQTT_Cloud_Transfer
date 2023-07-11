@@ -30,7 +30,6 @@ class ImageForwarder(Bridge):
     ):
         
         self.is_forwarding = False
-        
         # Validate user inputs
         if packet_size <= 0:
             raise ValueError("Packet size must be a positive integer")
@@ -64,40 +63,42 @@ class ImageForwarder(Bridge):
         super().__init__(mqtt_topic, client_id, user_id, password, host, port, keepalive, qos)
 
     def image_callback(self, msg):
-        try:
-            # 1. Convert the ROS message to a bytearray
-            byte_array = bytearray(msg.data)
+        
+        if self.is_forwarding:
+            try:
+                # 1. Convert the ROS message to a bytearray
+                byte_array = bytearray(msg.data)
 
-            # 2. Split the byte array into smaller packets
-            num_packets = (len(byte_array) + self.packet_size - 1) // self.packet_size
-            
-            for i in range(num_packets):
-                start = i * self.packet_size
-                end = (i + 1) * self.packet_size
-                packet = byte_array[start:end]
-                self.publish(self.mqtt_topic, message=packet)
+                # 2. Split the byte array into smaller packets
+                num_packets = (len(byte_array) + self.packet_size - 1) // self.packet_size
+                
+                for i in range(num_packets):
+                    start = i * self.packet_size
+                    end = (i + 1) * self.packet_size
+                    packet = byte_array[start:end]
+                    self.publish(self.mqtt_topic, message=packet)
 
-                self.logger.info(
-                    "Forwarded packet {} of {} with payload size {}".format(
-                        self.num_packets_forwarded + i + 1, num_packets, len(packet)
+                    self.logger.info(
+                        "Forwarded packet {} of {} with payload size {}".format(
+                            self.num_packets_forwarded + i + 1, num_packets, len(packet)
+                        )
                     )
-                )
 
-            self.logger.info("Forwarded image {} successfully".format(self.num_image_forwarded))
-            
-            # Increment the number of packets forwarded
-            self.num_packets_forwarded += num_packets
+                self.logger.info("Forwarded image {} successfully".format(self.num_image_forwarded))
+                
+                # Increment the number of packets forwarded
+                self.num_packets_forwarded += num_packets
 
-            # Unsubscribe from the ROS topic if we've forwarded the desired number of packets
-            if self.num_packets_forwarded >= self.num_packets:
-                # Unsubscribe from the ROS topic
-                self.sub.unregister()
-                rospy.loginfo("Forwarded {} packets, unsubscribing from topic".format(self.num_packets))
-                if self.exit_on_complete:
-                    rospy.signal_shutdown("Image forwarding complete")
+                # Unsubscribe from the ROS topic if we've forwarded the desired number of packets
+                if self.num_packets_forwarded >= self.num_packets:
+                    # Unsubscribe from the ROS topic
+                    self.sub.unregister()
+                    rospy.loginfo("Forwarded {} packets, unsubscribing from topic".format(self.num_packets))
+                    if self.exit_on_complete:
+                        rospy.signal_shutdown("Image forwarding complete")
 
-        except Exception as e:
-            self.logger.error("Error occurs when forwarding image: {}".format(e))
+            except Exception as e:
+                self.logger.error("Error occurs when forwarding image: {}".format(e))
 
     def start_forwarding(self):
         self.is_forwarding = True

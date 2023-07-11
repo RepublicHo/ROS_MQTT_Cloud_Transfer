@@ -31,6 +31,9 @@ class PointCloudForwarder(Bridge):
         enable_logging=DEFAULT_ENABLE_LOGGING
     ):
 
+        # Subscribe to the ROS topic
+        self.sub = rospy.Subscriber("/PR_BE/point_cloud", PointCloud, self.pc_callback)
+            
         self.is_forwarding = False
         
         self.num_point_clouds = num_point_clouds
@@ -57,51 +60,49 @@ class PointCloudForwarder(Bridge):
 
         super().__init__(mqtt_topic, client_id, user_id, password, host, port, keepalive, qos)
 
-    def forward_point_cloud(self):
-        if self.is_forwarding:
-            # Subscribe to the ROS topic
-            self.sub = rospy.Subscriber("/PR_BE/point_cloud", PointCloud, self.pc_callback)
+            
             
     def pc_callback(self, data):
         
-        try:
-            # 1. Convert the PointCloud message to a list of points.
-            point_array = np.array([(p.x, p.y, p.z) for p in data.points])
-            cloud_points = point_array.tolist()
+        if self.is_forwarding:
+            try:
+                # 1. Convert the PointCloud message to a list of points.
+                point_array = np.array([(p.x, p.y, p.z) for p in data.points])
+                cloud_points = point_array.tolist()
 
-            # 2. Convert each tuple in the list of points to a list of floats
-            cloud_points_float = [[float(i) for i in point] for point in cloud_points]
+                # 2. Convert each tuple in the list of points to a list of floats
+                cloud_points_float = [[float(i) for i in point] for point in cloud_points]
 
-            # 3. Flatten the list of lists into a single list of floats
-            cloud_points_flat = [coord for point in cloud_points_float for coord in point]
+                # 3. Flatten the list of lists into a single list of floats
+                cloud_points_flat = [coord for point in cloud_points_float for coord in point]
 
-            # 4. Pack the list of floats into a binary string
-            binary_msg = struct.pack("<%sf" % len(cloud_points_flat), *cloud_points_flat)
+                # 4. Pack the list of floats into a binary string
+                binary_msg = struct.pack("<%sf" % len(cloud_points_flat), *cloud_points_flat)
 
-            # 5. Convert the binary message to hexadecimal format
-            hex_msg = binascii.hexlify(binary_msg).decode()
+                # 5. Convert the binary message to hexadecimal format
+                hex_msg = binascii.hexlify(binary_msg).decode()
 
-            # Publish the hexadecimal message to the MQTT topic
-            self.publish(self.mqtt_topic, hex_msg)
-            self.logger.info(
-                "Forwarded point cloud {} with payload size {}".format(
-                    self.num_point_clouds_forwarded, len(hex_msg)
+                # Publish the hexadecimal message to the MQTT topic
+                self.publish(self.mqtt_topic, hex_msg)
+                self.logger.info(
+                    "Forwarded point cloud {} with payload size {}".format(
+                        self.num_point_clouds_forwarded, len(hex_msg)
+                    )
                 )
-            )
-            
-            # Increment the number of point clouds forwarded
-            self.num_point_clouds_forwarded += 1
+                
+                # Increment the number of point clouds forwarded
+                self.num_point_clouds_forwarded += 1
 
-            # Unsubscribe from ROS topic if we have forwarded the desired number of point clouds
-            if self.num_point_clouds_forwarded >= self.num_point_clouds:
-                # Unsubscribe from the ROS topic
-                self.sub.unsubscribe()
-                rospy.loginfo("Forwarded {} point clouds, unsubscribing from topic".format(self.num_images))
-                if self.exit_on_complete:
-                    rospy.signal_shutdown("Point Cloud forwarding complete")
+                # Unsubscribe from ROS topic if we have forwarded the desired number of point clouds
+                if self.num_point_clouds_forwarded >= self.num_point_clouds:
+                    # Unsubscribe from the ROS topic
+                    self.sub.unsubscribe()
+                    rospy.loginfo("Forwarded {} point clouds, unsubscribing from topic".format(self.num_images))
+                    if self.exit_on_complete:
+                        rospy.signal_shutdown("Point Cloud forwarding complete")
 
-        except Exception as e:
-            self.logger.error("Error occurs when forwarding point cloud: {}".format(e))
+            except Exception as e:
+                self.logger.error("Error occurs when forwarding point cloud: {}".format(e))
 
     def start_forwarding(self):
         self.is_forwarding = True
