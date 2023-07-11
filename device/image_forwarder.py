@@ -29,6 +29,8 @@ class ImageForwarder(Bridge):
         enable_logging=DEFAULT_ENABLE_LOGGING,
     ):
         
+        self.is_forwarding = False
+        
         # Validate user inputs
         if packet_size <= 0:
             raise ValueError("Packet size must be a positive integer")
@@ -97,6 +99,13 @@ class ImageForwarder(Bridge):
         except Exception as e:
             self.logger.error("Error occurs when forwarding image: {}".format(e))
 
-    def run(self):
-        # Spin the ROS node to receive messages
-        rospy.spin()
+    def start_forwarding(self):
+        self.is_forwarding = True
+        
+    def stop_forwarding(self):
+        self.is_forwarding = False
+        self.sub.unregister()
+        
+    # def run(self):
+    #     # Spin the ROS node to receive messages
+    #     rospy.spin()

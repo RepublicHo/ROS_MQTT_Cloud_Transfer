@@ -15,9 +15,12 @@ from image_forwarder import ImageForwarder
 import logging
 
 class Vibot(Bridge):
+    # Define class constant 
+    DEFAULT_MQTT_TOPIC = "/iot_device/command"
+    
     def __init__(
         self, 
-        mqtt_topic,
+        mqtt_topic=DEFAULT_MQTT_TOPIC,
         client_id="vibot_device", 
         user_id="", 
         password="", 
@@ -28,10 +31,14 @@ class Vibot(Bridge):
     ):
        
         self.status_check_topic = "/iot_device/status_check"
-        self.command_topic = "/iot_device/command"
+        self.command_topic = mqtt_topic
         self.response_topic = "/iot_device/command_response"
         
         self.enable_vio_algorithm_url = 'http://localhost:8000/Smart/algorithmEnable'
+        
+        # instantiate two bridges for point clouds and images
+        self.pc_bridge = PointCloudForwarder(mqtt_topic="/data/point_cloud", host="43.133.159.102", port=1883, qos=2)
+        self.img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=0)
 
         # Initialize the ROS forwarder node, which can
         # 1. Subscribe to a topic in ROS. 
@@ -59,23 +66,23 @@ class Vibot(Bridge):
         self.logger.addHandler(file_handler)
         
         # We take the command topic as default mqtt topic. 
-        super().__init__(self.command_topic, client_id, user_id, password, host, port, keepalive, qos)
+        super().__init__(mqtt_topic, client_id, user_id, password, host, port, keepalive, qos)
     
-    def point_cloud_transfer(self):
+    # def point_cloud_transfer(self):
         
-        # Create an instance of the forwarder class
-        # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead. 
-        # TODO: you can specify how many point clouds to transfer 
-        pc_bridge = PointCloudForwarder(mqtt_topic="/data/point_cloud", host="43.133.159.102", port=1883, qos=2)
-        pc_bridge.run()
+    #     # Create an instance of the forwarder class
+    #     # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead. 
+    #     # TODO: you can specify how many point clouds to transfer 
+    #     pc_bridge = PointCloudForwarder(mqtt_topic="/data/point_cloud", host="43.133.159.102", port=1883, qos=2)
+    #     pc_bridge.run()
     
-    def image_transfer(self):
+    # def image_transfer(self):
         
-        # Create an instance of the forwarder class
-        # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead.
-        # TODO: you can specify how many images to transfer 
-        img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=0)
-        img_bridge.run()
+    #     # Create an instance of the forwarder class
+    #     # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead.
+    #     # TODO: you can specify how many images to transfer 
+    #     img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=0)
+    #     img_bridge.run()
         
         
     def msg_process(self, msg):
@@ -116,7 +123,6 @@ class Vibot(Bridge):
         elif msg == "disable_vio_service":
             
             url = 'http://localhost:8000/Smart/algorithmDisable'
-
             response = requests.put(url)
 
             if response.status_code == 200:
@@ -129,46 +135,86 @@ class Vibot(Bridge):
             self.publish(self.response_topic, json_message)
                         
         elif msg == "start_point_cloud_transfer":
-            message = {'type': 'point_cloud_transfer', 'code': 200}
-            json_message = json.dumps(message)
-            self.publish("/iot_device/command_response", message=json_message)
-            print("--log--: sent to iot_device/command_response indicating we are starting the point cloud transfer")
-            
-            try:
-                self.point_cloud_transfer()
-            except rospy.ROSInterruptException:
-                pass
+            self.start_point_cloud_transfer()
             
         elif msg == "end_point_cloud_transfer":
-            print("End sending point cloud")
+            self.end_point_cloud_transfer()
             
         elif msg == "start_image_transfer":
-            message = {'type': 'image_transfer', 'code': 200}
-            json_message = json.dumps(message)
-            self.publish("iot_device/command_response", message=json_message)
-            print("--log--: sent to iot_device/image indicating we are starting the image transfer")
-            
-            try:
-                self.image_transfer()
-            except rospy.ROSInterruptException:
-                pass
+            self.start_image_transfer()
             
         elif msg == "end_image_transfer":
-            print("End sending image")
+            self.end_image_transfer()
             
         else:
-            self.logger.warning(f"Received unknown message: {msg} ")
+            self.logger.warning(f"Vibot received unknown message: {msg}")
             pass
+    
+
+    def start_point_cloud_transfer(self):
         
-
-    def looping(self, loop_timeout=30):
-        """
-        Start the MQTT client's event loop
-        :param loop_timeout: The maximum time to wait for incoming messages before returning
-        """
-        # self.client.loop(loop_timeout)
-        self.client.loop_forever()
-
+        message = {'type': 'start_point_cloud_transfer', 'code': 200}
+        json_message = json.dumps(message)
+        self.publish("/iot_device/command_response", message=json_message)
+        self.logger.debug("sent to iot_device/command_response indicating we are starting the point cloud transfer")
+        
+        try:
+            self.pc_bridge.start_forwarding()
+            rospy.spin()
+        except rospy.ROSInterruptException:
+            pass
+        except Exception as e:
+            # message = {'type': 'start_point_cloud_transfer', 'code': 400}
+            # json_message = json.dumps(message)
+            # self.publish("/iot_device/command_response", message=json_message)
+            self.logger.error(e)
+        
+    def end_point_cloud_transfer(self):
+        
+        message = {'type': 'end_point_cloud_transfer', 'code': 200}
+        json_message = json.dumps(message)
+        self.publish("/iot_device/command_response", message=json_message)
+        self.logger.debug("sent to iot_device/command_response indicating we are ending the point cloud transfer")
+        
+        try:
+            self.pc_bridge.stop_forwarding()
+            rospy.signal_shutdown('Stopped forwarding point clouds.')
+        except rospy.ROSInterruptException:
+            pass
+        except Exception as e:
+            # message = {'type': 'end_point_cloud_transfer', 'code': 400}
+            # json_message = json.dumps(message)
+            # self.publish("/iot_device/command_response", message=json_message)
+            self.logger.error(e)
+        
+    def start_image_transfer(self):
+        message = {'type': 'start_image_transfer', 'code': 200}
+        json_message = json.dumps(message)
+        self.publish("iot_device/command_response", message=json_message)
+        print("--log--: sent to iot_device/image indicating we are starting the image transfer")
+        
+        try:
+            self.img_bridge.start_forwarding()
+            rospy.spin()
+        except rospy.ROSInterruptException:
+            pass
+        except Exception as e:
+            self.logger.error(e)
+        
+    def end_image_transfer(self):
+        message = {'type': 'end_image_transfer', 'code': 200}
+        json_message = json.dumps(message)
+        self.publish("iot_device/command_response", message=json_message)
+        print("--log--: sent to iot_device/image indicating we are starting the image transfer")
+        
+        try:
+            self.img_bridge.stop_forwarding()
+            rospy.signal_shutdown('Stopped forwarding images.')
+        except rospy.ROSInterruptException:
+            pass
+        except Exception as e:
+            self.logger.error(e)
+            
     def on_connect(self, client, userdata, flags, rc):
         """
         Callback function called when the client successfully connects to the broker
@@ -201,65 +247,12 @@ class Vibot(Bridge):
             
             time.sleep(2)
         
-    def on_disconnect(self, client, userdata, rc):
-        """
-        Callback function called when the client is unexpectedly disconnected from the broker
-        """
-        if rc != 0:
-            if not self.disconnect_flag:
-                logging.warning("Unexpected disconnection.")
-                logging.warning("Trying reconnection")
-                self.rc = rc
-                self.connect()
 
-    def on_message(self, client, userdata, msg):
-        """
-        Callback function called when an incoming message is received
-        """
-        print(f"iot device received a message from {msg.topic}")
-        self.msg_process(msg)
-
-    # def unsubscribe(self):
-    #     """
-    #     Unsubscribe from the MQTT topic
-    #     """
-    #     print("Unsubscribing")
-    #     self.client.unsubscribe(self.status_check_topic)
-
-    def disconnect(self):
-        """
-        Disconnect from the MQTT broker
-        """
-        print("Disconnecting")
-        self.disconnect_flag = True
-        self.client.disconnect()
-
-    
-    def publish(self, topic, message):
-        """
-        Publish a message to the MQTT broker
-        :param message: The message to publish
-        """
-        self.client.publish(topic, message)
-
-    def hook(self):
-        """
-        Gracefully shut down the MQTT client
-        """
-        # self.unsubscribe()
-        self.disconnect()
-        print("Shutting down")
-
-    def get_timeout(self):
-        """
-        Get the amount of time elapsed since the connection attempt started
-        """
-        return self.timeout
 
 if __name__ == "__main__":
     
     # Set up MQTT client and callbacks
-    sn = Vibot(mqtt_topic=)
+    sn = Vibot(mqtt_topic="/iot_device/command")
     sn.looping()
     
 

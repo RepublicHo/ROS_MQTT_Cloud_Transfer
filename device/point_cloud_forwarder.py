@@ -20,7 +20,7 @@ class PointCloudForwarder(Bridge):
         self,
         mqtt_topic,
         client_id="pc_forwarder",
-        num_point_clouds=100,
+        num_point_clouds=1000,
         user_id="",
         password="",
         host="localhost",
@@ -31,10 +31,8 @@ class PointCloudForwarder(Bridge):
         enable_logging=DEFAULT_ENABLE_LOGGING
     ):
 
+        self.is_forwarding = False
         
-        # Subscribe to the ROS topic
-        self.sub = rospy.Subscriber("/PR_BE/point_cloud", PointCloud, self.pc_callback)
-
         self.num_point_clouds = num_point_clouds
         self.num_point_clouds_forwarded = 0
         self.exit_on_complete = exit_on_complete
@@ -59,7 +57,13 @@ class PointCloudForwarder(Bridge):
 
         super().__init__(mqtt_topic, client_id, user_id, password, host, port, keepalive, qos)
 
+    def forward_point_cloud(self):
+        if self.is_forwarding:
+            # Subscribe to the ROS topic
+            self.sub = rospy.Subscriber("/PR_BE/point_cloud", PointCloud, self.pc_callback)
+            
     def pc_callback(self, data):
+        
         try:
             # 1. Convert the PointCloud message to a list of points.
             point_array = np.array([(p.x, p.y, p.z) for p in data.points])
@@ -99,6 +103,13 @@ class PointCloudForwarder(Bridge):
         except Exception as e:
             self.logger.error("Error occurs when forwarding point cloud: {}".format(e))
 
-    def run(self):
-        # Spin the ROS node to receive messages
-        rospy.spin()
+    def start_forwarding(self):
+        self.is_forwarding = True
+        
+    def stop_forwarding(self):
+        self.is_forwarding = False
+        self.sub.unregister()
+    
+    # def run(self):
+    #     # Spin the ROS node to receive messages
+    #     rospy.spin()
