@@ -9,13 +9,10 @@ from sensor_msgs.msg import Image
 import rospy
 import threading
 import os
-import struct
 import logging
 import json
-import binascii
 import config as CONFIG
 import iot_status_checker as isc
-
 
 from bridge import Bridge
 
@@ -72,8 +69,7 @@ class DeviceCommander(Bridge):
         file_handler = logging.FileHandler("device_commander.log")
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
-        
+        self.logger.addHandler(file_handler)  
         
         self.vio_enabled = False
         
@@ -84,8 +80,6 @@ class DeviceCommander(Bridge):
         self.last_heartbeat_time = time.time()
         self.HEARTBEAT_TIMEOUT = 30 # seconds
         
-        
-
         super().__init__(mqtt_topic, client_id, user_id, 
                          password, host, port, keepalive, qos)
      
@@ -96,7 +90,7 @@ class DeviceCommander(Bridge):
         if msg.topic == self.DEVICE_HEARTBEAT:
             self.last_heartbeat_time = time.time()
             # test code: print message when it hearts the heartbeat. 
-            self.logger.debug("Heartbeat received, updated last_heartbeat: ", self.last_heartbeat_time)
+            self.logger.info("Heartbeat received, updated last_heartbeat: {self.last_heartbeat_time}")
                
         elif msg.topic == self.DATA_TOPISCS["point_cloud"]:
             # point cloud message will be handled by point cloud processor instance 
@@ -140,6 +134,7 @@ class DeviceCommander(Bridge):
                 self.pc_processor.start_processing()
                 
             elif json_msg['type'] == "start_image_transfer" and json_msg['code'] == 200:
+                print("test!!!")
                 self.image_processor.start_processing()
 
             elif json_msg['type'] == "end_point_cloud_transfer" and json_msg['code'] == 200:
@@ -153,8 +148,6 @@ class DeviceCommander(Bridge):
         
         else:
             self.logger.warning("An invalid JSON message is received! Please check!")
-      
-
     
     def check_device_power_status(self):
         
@@ -181,7 +174,7 @@ class DeviceCommander(Bridge):
         """
         while self.status == 1:
             # test code
-            # print(f"time now: {time.time()}, and last_heartbeat_time: {self.last_heartbeat_time}")
+            print(f"time now: {time.time()}, and last_heartbeat_time: {self.last_heartbeat_time}")
             time_since_last_heartbeat = time.time() - self.last_heartbeat_time
             if time_since_last_heartbeat > self.HEARTBEAT_TIMEOUT:
                 with self.lock:
@@ -323,8 +316,7 @@ class DeviceCommander(Bridge):
                     
                 else:
                     last_command_result = "Invalid choice. Please try again."
-
-                        
+             
                 if self.status == 0:
                     last_command_result = "Detected the device failed to connect to MQTT broker. Please check the device. "
                     

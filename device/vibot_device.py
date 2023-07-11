@@ -8,8 +8,6 @@ import time
 import rospy
 import numpy as np
 from bridge import Bridge
-from sensor_msgs.msg import PointCloud
-from sensor_msgs.msg import Image
 from point_cloud_forwarder import PointCloudForwarder
 from image_forwarder import ImageForwarder
 import logging
@@ -38,7 +36,7 @@ class Vibot(Bridge):
         
         # instantiate two bridges for point clouds and images
         self.pc_bridge = PointCloudForwarder(mqtt_topic="/data/point_cloud", host="43.133.159.102", port=1883, qos=2)
-        self.img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=0)
+        self.img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=2)
 
         # Initialize the ROS forwarder node, which can
         # 1. Subscribe to a topic in ROS. 
@@ -67,24 +65,7 @@ class Vibot(Bridge):
         
         # We take the command topic as default mqtt topic. 
         super().__init__(mqtt_topic, client_id, user_id, password, host, port, keepalive, qos)
-    
-    # def point_cloud_transfer(self):
-        
-    #     # Create an instance of the forwarder class
-    #     # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead. 
-    #     # TODO: you can specify how many point clouds to transfer 
-    #     pc_bridge = PointCloudForwarder(mqtt_topic="/data/point_cloud", host="43.133.159.102", port=1883, qos=2)
-    #     pc_bridge.run()
-    
-    # def image_transfer(self):
-        
-    #     # Create an instance of the forwarder class
-    #     # QoS is set as 2 to ensure the message is delivered exactly once, which brings more overhead.
-    #     # TODO: you can specify how many images to transfer 
-    #     img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=0)
-    #     img_bridge.run()
-        
-        
+                
     def msg_process(self, msg):
         """
         Process incoming MQTT messages from topic "/iot_device/command"
@@ -126,9 +107,9 @@ class Vibot(Bridge):
             response = requests.put(url)
 
             if response.status_code == 200:
-                    self.logger.info('Vio algorithm disabled\n')
+                self.logger.info('Vio algorithm disabled\n')
             else:
-                    self.logger.info('Failed to enable vio algorithm, please disable it manually\n')
+                self.logger.info('Failed to enable vio algorithm, please disable it manually\n')
             
             message = {'type': 'disable_vio', 'code': response.status_code}
             json_message = json.dumps(message)
@@ -160,6 +141,7 @@ class Vibot(Bridge):
         
         try:
             self.pc_bridge.start_forwarding()
+
             rospy.spin()
         except rospy.ROSInterruptException:
             pass
@@ -178,6 +160,7 @@ class Vibot(Bridge):
         
         try:
             self.pc_bridge.stop_forwarding()
+            
             rospy.signal_shutdown('Stopped forwarding point clouds.')
         except rospy.ROSInterruptException:
             pass
@@ -237,20 +220,9 @@ class Vibot(Bridge):
         Publish device heartbeat 
         """
         while True:
-            self.publish("/iot_device/heartbeat", "heartbeat")
-            
-            #optional logger
-            #self.logger.info("vibot: heartbeat sent")
-            
-            #testing code 
-            # payload = {"name": "John", "age": 30, "city": "New York"}
-            # json_payload = json.dumps(payload)
-            # self.publish("/iot_device/command_response", json_payload)
-            
+            self.publish("/iot_device/heartbeat", "heartbeat")            
             time.sleep(2)
         
-
-
 if __name__ == "__main__":
     
     # Set up MQTT client and callbacks
