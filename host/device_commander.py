@@ -59,6 +59,9 @@ class DeviceCommander(Bridge):
         self.image_processor = ImageProcessor(self.DATA_TOPISCS["image"], host=CONFIG.CONNECTION.BROKER, port=1883)
         self.pc_processor = PointCloudProcessor(self.DATA_TOPISCS["point_cloud"], host=CONFIG.CONNECTION.BROKER, port=1883)
         
+        # Topics for various data transfer. 
+        self.pc_topic = None
+        self.img_topic = None
         
         # Configure logging to both console and file
         self.logger = logging.getLogger(__name__)
@@ -96,6 +99,7 @@ class DeviceCommander(Bridge):
     def restart_check_heartbeat(self):
         with self._lock:
             self.heartbeat_running = True
+            self.last_heartbeat_time = time.time()
         
     def stop_check_heartbeat(self):
         with self._lock:
@@ -116,7 +120,7 @@ class DeviceCommander(Bridge):
             with self._lock:
                 if self.heartbeat_running:     
                     # test code
-                    print(f"time now: {time.time()}, and last_heartbeat_time: {self.last_heartbeat_time}")
+                    # print(f"time now: {time.time()}, and last_heartbeat_time: {self.last_heartbeat_time}")
                     time_since_last_heartbeat = time.time() - self.last_heartbeat_time
                     if time_since_last_heartbeat > self.HEARTBEAT_TIMEOUT:
                         self.status = 0
@@ -144,6 +148,7 @@ class DeviceCommander(Bridge):
             pass
             
         elif msg.topic == self.COMMAND_RESPONSE:  
+            self.logger.info("Command response received!!!!!")
             self.msg_process(msg)
         
         else: # If message is from an unknown topic, it serves as a reminder. 
@@ -173,20 +178,22 @@ class DeviceCommander(Bridge):
             elif json_msg['type'] == "disable_vio" and json_msg['code'] == 200:
                 self.vio_enabled = False
                 
-            elif json_msg['type'] == "start_point_cloud_transfer" and json_msg['code'] == 200:
-                self.logger.debug("Device responses that it will be starting point cloud transfer")
+            elif json_msg['type'] == "start_pc" and json_msg['code'] == 200:
+                self.logger.info("Device responses that it will be starting point cloud transfer")
+                self.pc_topic = json_msg['topic']
                 # self.pc_processor.start_processing()
+            
+            elif json_msg['type'] == "end_pc" and json_msg['code'] == 200:
+                self.logger.info("Device responses that it will be ending point cloud transfer")
                 
-            elif json_msg['type'] == "start_image_transfer" and json_msg['code'] == 200:
-                self.logger.debug("Device responses that it will be starting image transfer")
+            elif json_msg['type'] == "end_img" and json_msg['code'] == 200:
+                self.logger.info("Device responses that it will be starting image transfer")
+                self.img_topic = json_msg['topic']
                 # self.image_processor.start_processing()
 
-            elif json_msg['type'] == "end_point_cloud_transfer" and json_msg['code'] == 200:
-                self.logger.debug("Device responses that it will be ending point cloud transfer")
-                # self.pc_processor.stop_processing()
                 
-            elif json_msg['type'] == "end_image_transfer" and json_msg['code'] == 200:
-                self.logger.debug("Device responses that it will be ending image transfer")
+            elif json_msg['type'] == "end_img" and json_msg['code'] == 200:
+                self.logger.info("Device responses that it will be ending image transfer")
                 # self.image_processor.stop_processing()
             
             else:
@@ -209,9 +216,6 @@ class DeviceCommander(Bridge):
         else:
             print("::: Device is OFF, please check the device")
             return 0
-    
-    
-
     
     # Define the function to enable the vio capturing algorithm
     def enable_vio_algorithm(self):
@@ -258,7 +262,25 @@ class DeviceCommander(Bridge):
         # then the function executes the clear command instead.
             os.system('clear')
 
-
+    def wait_for_pc_topic(self):
+        while self.pc_topic is None:
+            time.sleep(0.5)  # wait for a short time before checking again
+        return f"The point cloud data will be transferred over topic {self.pc_topic}"
+    
+    def end_pc_transfer(self):
+        self.pc_topic = None
+        return "OK"
+    
+    def wait_for_img_topic(self):
+        while self.img_topic is None:
+            time.sleep(0.5)  # wait for a short time before checking again
+        
+        return f"The image data will be transferred over topic {self.img_topic}"
+    
+    def end_img_transfer(self):
+        self.img_topic = None
+        return "OK"
+            
     def menu(self):
 
         self.clear()
@@ -272,7 +294,10 @@ class DeviceCommander(Bridge):
             
             # Continuously subscribe to heartbeat topic in the cloud.  
             self.subscribe(self.DEVICE_HEARTBEAT)
+            self.subscribe(self.COMMAND_RESPONSE)
             
+            self.client.message_callback_add(self.DEVICE_HEARTBEAT, self.on_message)
+            self.client.message_callback_add(self.COMMAND_RESPONSE, self.on_message)
             
             self.client.loop_start()
             
@@ -295,8 +320,7 @@ class DeviceCommander(Bridge):
                 {"name": "Disable Vio algorithm Service", "value": 2},
                 {"name": "Start Point Cloud Transfer", "value": 3},
                 {"name": "End Point Cloud Transfer", "value": 4},
-                {"name": "Start Image Transfer", "value": 5},
-                {"name": "End Image Transfer", "value": 6},
+                {"name": "Obtain one Image", "value": 5},
                 {"name": "Exit", "value": 0}
             ]
                 
@@ -326,25 +350,23 @@ class DeviceCommander(Bridge):
                 elif choice == "3":
                     # self.subscribe(self.DATA_TOPISCS["point_cloud"])
                     self.publish(self.COMMAND, "start_point_cloud_transfer")
-                    last_command_result = "Point cloud transfer starts. Heartbeat checking is paused temporarily. "
+                    print("Point cloud transfer starts. Heartbeat checking is paused temporarily. ")
                     self.stop_check_heartbeat()
+                    last_command_result = self.wait_for_pc_topic()
                     
                 elif choice == "4":
                     # self.subscribe(self.DATA_TOPISCS["image"])
                     self.publish(self.COMMAND, "end_point_cloud_transfer")
-                    last_command_result = "Point cloud transfer ends. Heartbeat checking is resumed. "
+                    print("Point cloud transfer ends. Heartbeat checking is resumed. ")
                     self.restart_check_heartbeat()
+                    last_command_result = self.end_pc_transfer()
                     
                 elif choice == "5":
                     # self.unsubscribe(self.DATA_TOPISCS["point_cloud"])
                     self.publish(self.COMMAND, "start_image_transfer")
-                    last_command_result = "Image transfer starts. Heartbeat checking is paused temporarily. "
+                    print("Image transfer starts. Heartbeat checking is paused temporarily. ")
                     self.stop_check_heartbeat()
-                    
-                elif choice == "6":
-                    # self.unsubscribe(self.DATA_TOPISCS["image"])
-                    self.publish(self.COMMAND, "end_image_transfer")
-                    last_command_result = "Image transfer ends. Heartbeat checking is resumed. "
+                    last_command_result = self.wait_for_img_topic()
                     self.restart_check_heartbeat()
                     
                 else:

@@ -35,8 +35,14 @@ class Vibot(Bridge):
         self.enable_vio_algorithm_url = 'http://localhost:8000/Smart/algorithmEnable'
         
         # instantiate two bridges for point clouds and images
-        self.pc_bridge = PointCloudForwarder(mqtt_topic="/data/point_cloud", host="43.133.159.102", port=1883, qos=2)
-        self.img_bridge = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=2)
+        self.pc_bridge = PointCloudForwarder(
+            mqtt_topic="/data/point_cloud", num_point_clouds=100,
+            host="43.133.159.102", port=1883, qos=2
+            )
+        self.img_bridge = ImageForwarder(
+            mqtt_topic="/data/img", 
+            host="43.133.159.102", port=1883, qos=2
+            )
 
         # Initialize the ROS forwarder node, which can
         # 1. Subscribe to a topic in ROS. 
@@ -72,7 +78,7 @@ class Vibot(Bridge):
         """
         msg_topic = msg.topic
         msg = str(msg.payload.decode())
-        self.logger.debug(f"Processing message {msg} from topic {msg_topic}")
+        self.logger.info(f"Processing message {msg} from topic {msg_topic}")
         
         if msg == "status_check":
             # This message is used to verify the status of the IoT device. 
@@ -116,88 +122,37 @@ class Vibot(Bridge):
             self.publish(self.response_topic, json_message)
                         
         elif msg == "start_point_cloud_transfer":
-            self.start_point_cloud_transfer()
+            
+            message = {'type': 'start_pc', 'code': 200, 'topic': 'test_topic'}
+            json_message = json.dumps(message)
+            self.publish(self.response_topic, json_message)
+            self.logger.info("--log--: sent to iot_device/command_response indicating we are starting the point cloud transfer")
+            
+            self.pc_bridge.start_forwarding()
             
         elif msg == "end_point_cloud_transfer":
-            self.end_point_cloud_transfer()
+            
+            message = {'type': 'end_pc', 'code': 200}
+            json_message = json.dumps(message)
+            self.publish(self.response_topic, message=json_message)
+            self.logger.info("--log--: sent to iot_device/command_response indicating we are ending the point cloud transfer")
+            
+            self.pc_bridge.stop_forwarding()
             
         elif msg == "start_image_transfer":
-            self.start_image_transfer()
             
-        elif msg == "end_image_transfer":
-            self.end_image_transfer()
+            # message = {'type': 'start_img', 'code': 200, 'topic': 'test_topic'}
+            # json_message = json.dumps(message)
+            # self.publish(self.response_topic, message=json_message)
+            
+            self.img_bridge.start_forwarding(100)
+            self.img_bridge.stop_forwarding()
             
         else:
             self.logger.warning(f"Vibot received unknown message: {msg}")
             pass
     
-
-    def start_point_cloud_transfer(self):
-        
-        message = {'type': 'start_point_cloud_transfer', 'code': 200}
-        json_message = json.dumps(message)
-        self.publish("/iot_device/command_response", message=json_message)
-        self.logger.debug("sent to iot_device/command_response indicating we are starting the point cloud transfer")
-        
-        try:
-            self.pc_bridge.start_forwarding()
-
-            rospy.spin()
-        except rospy.ROSInterruptException:
-            pass
-        except Exception as e:
-            # message = {'type': 'start_point_cloud_transfer', 'code': 400}
-            # json_message = json.dumps(message)
-            # self.publish("/iot_device/command_response", message=json_message)
-            self.logger.error(e)
-        
-    def end_point_cloud_transfer(self):
-        
-        message = {'type': 'end_point_cloud_transfer', 'code': 200}
-        json_message = json.dumps(message)
-        self.publish("/iot_device/command_response", message=json_message)
-        self.logger.debug("sent to iot_device/command_response indicating we are ending the point cloud transfer")
-        
-        try:
-            self.pc_bridge.stop_forwarding()
-            
-            rospy.signal_shutdown('Stopped forwarding point clouds.')
-        except rospy.ROSInterruptException:
-            pass
-        except Exception as e:
-            # message = {'type': 'end_point_cloud_transfer', 'code': 400}
-            # json_message = json.dumps(message)
-            # self.publish("/iot_device/command_response", message=json_message)
-            self.logger.error(e)
-        
-    def start_image_transfer(self):
-        message = {'type': 'start_image_transfer', 'code': 200}
-        json_message = json.dumps(message)
-        self.publish("iot_device/command_response", message=json_message)
-        print("--log--: sent to iot_device/image indicating we are starting the image transfer")
-        
-        try:
-            self.img_bridge.start_forwarding()
-            rospy.spin()
-        except rospy.ROSInterruptException:
-            pass
-        except Exception as e:
-            self.logger.error(e)
-        
-    def end_image_transfer(self):
-        message = {'type': 'end_image_transfer', 'code': 200}
-        json_message = json.dumps(message)
-        self.publish("iot_device/command_response", message=json_message)
-        print("--log--: sent to iot_device/image indicating we are starting the image transfer")
-        
-        try:
-            self.img_bridge.stop_forwarding()
-            rospy.signal_shutdown('Stopped forwarding images.')
-        except rospy.ROSInterruptException:
-            pass
-        except Exception as e:
-            self.logger.error(e)
-            
+                
     def on_connect(self, client, userdata, flags, rc):
         """
         Callback function called when the client successfully connects to the broker
@@ -224,10 +179,13 @@ class Vibot(Bridge):
         
 if __name__ == "__main__":
     
-    # Set up MQTT client and callbacks
-    sn = Vibot()
-    sn.client.loop_forever()
-    
+    try: 
+        # Set up MQTT client and callbacks
+        sn = Vibot()
+        sn.client.loop_forever()
+    except rospy.ROSInterruptException:
+        
+        pass
 
     
 

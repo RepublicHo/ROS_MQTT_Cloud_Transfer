@@ -1,10 +1,7 @@
-#!/usr/bin/env python
-
 import logging
 import rospy
 from sensor_msgs.msg import Image
 from bridge import Bridge
-
 
 class ImageForwarder(Bridge):
     # Define class constants for magic numbers
@@ -13,7 +10,7 @@ class ImageForwarder(Bridge):
     DEFAULT_KEEPALIVE = 60
     DEFAULT_EXIT_ON_COMPLETE = True
     DEFAULT_ENABLE_LOGGING = True
-    
+
     def __init__(
         self,
         mqtt_topic,
@@ -28,15 +25,8 @@ class ImageForwarder(Bridge):
         exit_on_complete=DEFAULT_EXIT_ON_COMPLETE,
         enable_logging=DEFAULT_ENABLE_LOGGING,
     ):
-        
+        self.sub = None
         self.is_forwarding = False
-        # Validate user inputs
-        if packet_size <= 0:
-            raise ValueError("Packet size must be a positive integer")
-        
-        # Subscribe to the ROS topic
-        self.sub = rospy.Subscriber("/PR_FE/feature_img", Image, self.image_callback)
-
         self.packet_size = packet_size
         self.num_packets_forwarded = 0
         self.num_image_forwarded = 0
@@ -63,7 +53,6 @@ class ImageForwarder(Bridge):
         super().__init__(mqtt_topic, client_id, user_id, password, host, port, keepalive, qos)
 
     def image_callback(self, msg):
-        
         if self.is_forwarding:
             try:
                 # 1. Convert the ROS message to a bytearray
@@ -71,7 +60,7 @@ class ImageForwarder(Bridge):
 
                 # 2. Split the byte array into smaller packets
                 num_packets = (len(byte_array) + self.packet_size - 1) // self.packet_size
-                
+
                 for i in range(num_packets):
                     start = i * self.packet_size
                     end = (i + 1) * self.packet_size
@@ -85,7 +74,7 @@ class ImageForwarder(Bridge):
                     )
 
                 self.logger.info("Forwarded image {} successfully".format(self.num_image_forwarded))
-                
+
                 # Increment the number of packets forwarded
                 self.num_packets_forwarded += num_packets
 
@@ -100,13 +89,33 @@ class ImageForwarder(Bridge):
             except Exception as e:
                 self.logger.error("Error occurs when forwarding image: {}".format(e))
 
-    def start_forwarding(self):
-        self.is_forwarding = True
+    def start_forwarding(self, num_packets):
+        # Set the desired number of packets to forward
+        self.num_packets = num_packets
         
+        # Subscribe to the ROS topic
+        self.sub = rospy.Subscriber("/PR_FE/feature_img", Image, self.image_callback)
+        self.is_forwarding = True
+
     def stop_forwarding(self):
         self.is_forwarding = False
-        self.sub.unregister()
-        
-    # def run(self):
-    #     # Spin the ROS node to receive messages
-    #     rospy.spin()
+        if self.sub is not None:
+            self.sub.unregister()
+        self.sub = None
+
+# Sample code for publishing data
+# if __name__ == "__main__":
+#     # Create a ROS node
+#     rospy.init_node("image_forwarder")
+    
+#     # Create an ImageForwarder object
+#     forwarder = ImageForwarder(mqtt_topic="/data/img", host="43.133.159.102", port=1883, qos=2)
+
+#     # Start forwarding images for 10 packets
+#     forwarder.start_forwarding(10)
+
+#     # Wait for user input to stop forwarding images
+#     input("Press Enter to stop forwarding images...")
+
+#     # Stop forwarding images
+#     forwarder.stop_forwarding()

@@ -86,7 +86,8 @@ python mqtt_to_ros.py -H <mqtt_broker_host> -P <mqtt_broker_port> -FT <mqtt_from
 正常用MQTT的command:
 
 mosquitto_pub -h 121.41.94.38 -p 1883 -t ABC -m "Hello World!"
-mosquitto_sub -h 121.41.94.38 -p 1883 -t ABC
+mosquitto_sub -h 43.133.159.102 -p 1883 -t /data/point_cloud
+mosquitto_sub -h 43.133.159.102 -p 1883 -t /data/img
 
 如果在
 ## Requirements

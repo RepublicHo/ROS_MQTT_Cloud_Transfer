@@ -1,10 +1,9 @@
-#!/usr/bin/env python
-
 import logging
 import rospy
 import struct
 import numpy as np
 import binascii
+import time
 from sensor_msgs.msg import PointCloud
 from bridge import Bridge
 
@@ -31,11 +30,7 @@ class PointCloudForwarder(Bridge):
         enable_logging=DEFAULT_ENABLE_LOGGING
     ):
 
-        # Subscribe to the ROS topic
-        self.sub = rospy.Subscriber("/PR_BE/point_cloud", PointCloud, self.pc_callback)
-            
         self.is_forwarding = False
-        
         self.num_point_clouds = num_point_clouds
         self.num_point_clouds_forwarded = 0
         self.exit_on_complete = exit_on_complete
@@ -60,12 +55,10 @@ class PointCloudForwarder(Bridge):
 
         super().__init__(mqtt_topic, client_id, user_id, password, host, port, keepalive, qos)
 
-            
-            
     def pc_callback(self, data):
-        
         if self.is_forwarding:
             try:
+                time.sleep(0.1)
                 # 1. Convert the PointCloud message to a list of points.
                 point_array = np.array([(p.x, p.y, p.z) for p in data.points])
                 cloud_points = point_array.tolist()
@@ -96,8 +89,8 @@ class PointCloudForwarder(Bridge):
                 # Unsubscribe from ROS topic if we have forwarded the desired number of point clouds
                 if self.num_point_clouds_forwarded >= self.num_point_clouds:
                     # Unsubscribe from the ROS topic
-                    self.sub.unsubscribe()
-                    rospy.loginfo("Forwarded {} point clouds, unsubscribing from topic".format(self.num_images))
+                    self.sub.unregister()
+                    rospy.loginfo("Forwarded {} point clouds, unsubscribing from topic".format(self.num_point_clouds))
                     if self.exit_on_complete:
                         rospy.signal_shutdown("Point Cloud forwarding complete")
 
@@ -105,12 +98,38 @@ class PointCloudForwarder(Bridge):
                 self.logger.error("Error occurs when forwarding point cloud: {}".format(e))
 
     def start_forwarding(self):
+        # Subscribe to the ROS topic
+        self.sub = rospy.Subscriber("/PR_BE/point_cloud", PointCloud, self.pc_callback)
         self.is_forwarding = True
         
     def stop_forwarding(self):
         self.is_forwarding = False
-        self.sub.unregister()
-    
-    # def run(self):
-    #     # Spin the ROS node to receive messages
-    #     rospy.spin()
+        if self.sub is not None:
+            self.sub.unregister()
+        self.sub = None
+
+# Sample code for publishing data  
+# def main():
+#     # Initialize ROS node
+#     rospy.init_node("point_cloud_forwarder")
+
+#     # Create PointCloudForwarder instance
+#     forwarder = PointCloudForwarder(
+#         mqtt_topic="/data/point_cloud", host="43.133.159.102", port=1883, 
+#         num_point_clouds=10, qos=2
+#     )
+
+#     # Start forwarding point clouds
+#     forwarder.start_forwarding()
+
+#     # Wait for some time
+#     rospy.sleep(5)
+
+#     # Stop forwarding point clouds
+#     forwarder.stop_forwarding()
+
+#     # Shutdown ROS node
+#     rospy.signal_shutdown("Finished forwarding point clouds")
+
+# if __name__ == "__main__":
+#     main()
