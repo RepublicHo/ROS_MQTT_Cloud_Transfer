@@ -212,15 +212,14 @@ class Vibot(Bridge):
         # main program from existing. when the main program exists, any 
         # remaining daemon threads are terminated automatically. 
         heartbeat_thread = threading.Thread(target=self.send_heartbeat, daemon=True)
-        heartbeat_thread.start()
-        
+        heartbeat_thread.start()   
     
     def send_heartbeat(self):
         """
         Publish device heartbeat 
         """
         while True:
-            self.publish("/iot_device/heartbeat", "heartbeat")            
+            self.publish("/iot_device/heartbeat", "heartbeat", qos=1)            
             time.sleep(2)
         
 if __name__ == "__main__":

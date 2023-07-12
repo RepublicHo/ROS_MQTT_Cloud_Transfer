@@ -40,6 +40,12 @@ class DeviceCommander(Bridge):
         self.DATA_TOPISCS = {"point_cloud": "/data/point_cloud",
                              "image": "/data/img"}
 
+        self.heartbeat_thread = None
+        self.heartbeat_running = False
+        self._lock = threading.Lock()
+        self.last_heartbeat_time = time.time()
+        self.HEARTBEAT_TIMEOUT = 60 # seconds
+        
         # connected is used for checking if the host can connected to the MQTT broker
         # TODO: if lose connection, set it to false and reconnect once again. 
         self.connected = False
@@ -74,15 +80,52 @@ class DeviceCommander(Bridge):
         self.vio_enabled = False
         
         # TODO: Not yet used. 
-        self.lock = threading.Lock()
         self.user_input_queue = queue.Queue()
         self.status = 0 # 0 for not connected, 1 for connected, 2 for timeout or other bugs
-        self.last_heartbeat_time = time.time()
-        self.HEARTBEAT_TIMEOUT = 30 # seconds
+        
         
         super().__init__(mqtt_topic, client_id, user_id, 
                          password, host, port, keepalive, qos)
      
+    def start_check_heartbeat(self):
+        with self._lock:
+            if not self.heartbeat_running:
+                self.heartbeat_running = True
+                self.heartbeat_thread.start()
+    
+    def restart_check_heartbeat(self):
+        with self._lock:
+            self.heartbeat_running = True
+        
+    def stop_check_heartbeat(self):
+        with self._lock:
+            self.heartbeat_running = False
+            
+    def end_check_heartbeat(self):
+        self.stop_check_heartbeat()
+        self.heartbeat_thread.join() 
+        
+    def check_heartbeat(self):
+        """Checks if the device has received a heartbeat message from the cloud within the specified timeout.
+
+        If the last heartbeat time is older than the heartbeat timeout duration, sets the status to 0 (timeout).
+
+        To stop this function, set the status to a value other than 1.
+        """
+        while self.status == 1:
+            with self._lock:
+                if self.heartbeat_running:     
+                    # test code
+                    print(f"time now: {time.time()}, and last_heartbeat_time: {self.last_heartbeat_time}")
+                    time_since_last_heartbeat = time.time() - self.last_heartbeat_time
+                    if time_since_last_heartbeat > self.HEARTBEAT_TIMEOUT:
+                        self.status = 0
+                        self.logger.warning("Heartbeat timed out")
+                        
+            time.sleep(1)
+            
+        self.logger.info("Heartbeat check stopped")
+        self.hook()    
  
     # Define the function to handle incoming messages
     def on_message(self, client, userdata, msg):   
@@ -131,17 +174,20 @@ class DeviceCommander(Bridge):
                 self.vio_enabled = False
                 
             elif json_msg['type'] == "start_point_cloud_transfer" and json_msg['code'] == 200:
-                self.pc_processor.start_processing()
+                self.logger.debug("Device responses that it will be starting point cloud transfer")
+                # self.pc_processor.start_processing()
                 
             elif json_msg['type'] == "start_image_transfer" and json_msg['code'] == 200:
-                print("test!!!")
-                self.image_processor.start_processing()
+                self.logger.debug("Device responses that it will be starting image transfer")
+                # self.image_processor.start_processing()
 
             elif json_msg['type'] == "end_point_cloud_transfer" and json_msg['code'] == 200:
-                self.pc_processor.stop_processing()
+                self.logger.debug("Device responses that it will be ending point cloud transfer")
+                # self.pc_processor.stop_processing()
                 
             elif json_msg['type'] == "end_image_transfer" and json_msg['code'] == 200:
-                self.image_processor.stop_processing()
+                self.logger.debug("Device responses that it will be ending image transfer")
+                # self.image_processor.stop_processing()
             
             else:
                 self.logger.warning(f"A JSON message {json_msg['type']} with code {json_msg['code']} is received unexpectedly!")
@@ -165,23 +211,6 @@ class DeviceCommander(Bridge):
             return 0
     
     
-    def check_heartbeat(self):
-        """Checks if the device has received a heartbeat message from the cloud within the specified timeout.
-
-        If the last heartbeat time is older than the heartbeat timeout duration, sets the status to 0 (timeout).
-
-        To stop this function, set the status to a value other than 1.
-        """
-        while self.status == 1:
-            # test code
-            print(f"time now: {time.time()}, and last_heartbeat_time: {self.last_heartbeat_time}")
-            time_since_last_heartbeat = time.time() - self.last_heartbeat_time
-            if time_since_last_heartbeat > self.HEARTBEAT_TIMEOUT:
-                with self.lock:
-                    self.status = 0
-                    self.logger.warning("Heartbeat timed out")
-            time.sleep(1)
-        self.logger.info("Heartbeat check stopped")
 
     
     # Define the function to enable the vio capturing algorithm
@@ -233,7 +262,7 @@ class DeviceCommander(Bridge):
     def menu(self):
 
         self.clear()
-        with self.lock:
+        with self._lock:
             self.status = self.check_device_power_status()
         print("=====================Status==================")
         self.logger.debug(f"The status code is {self.status}")
@@ -248,8 +277,9 @@ class DeviceCommander(Bridge):
             self.client.loop_start()
             
             self.last_heartbeat_time = time.time()
-            heartbeat_thread = threading.Thread(target=self.check_heartbeat, daemon=True)
-            heartbeat_thread.start()
+            self.heartbeat_thread = threading.Thread(target=self.check_heartbeat, daemon=True)
+            self.start_check_heartbeat()
+            
             time.sleep(1)
             # network_thread = threading.Thread(self.)
             print(
@@ -263,13 +293,12 @@ class DeviceCommander(Bridge):
             menu_options = [
                 {"name": "Enable Vio algorithm Service", "value": 1},
                 {"name": "Disable Vio algorithm Service", "value": 2},
-                {"name": "Start transferring Point Cloud", "value": 3},
-                {"name": "Start transferring Image", "value": 4},
-                {"name": "End transferring Point Cloud", "value": 5},
-                {"name": "End transferring Image", "value": 6},
+                {"name": "Start Point Cloud Transfer", "value": 3},
+                {"name": "End Point Cloud Transfer", "value": 4},
+                {"name": "Start Image Transfer", "value": 5},
+                {"name": "End Image Transfer", "value": 6},
                 {"name": "Exit", "value": 0}
             ]
-                
                 
             # Display the menu and prompt the user for input
             while self.status == 1:
@@ -297,28 +326,33 @@ class DeviceCommander(Bridge):
                 elif choice == "3":
                     # self.subscribe(self.DATA_TOPISCS["point_cloud"])
                     self.publish(self.COMMAND, "start_point_cloud_transfer")
-                    last_command_result = "point cloud transfer starts. "
+                    last_command_result = "Point cloud transfer starts. Heartbeat checking is paused temporarily. "
+                    self.stop_check_heartbeat()
                     
                 elif choice == "4":
                     # self.subscribe(self.DATA_TOPISCS["image"])
-                    self.publish(self.COMMAND, "start_image_transfer")
-                    last_command_result = "point cloud transfer ends. "
+                    self.publish(self.COMMAND, "end_point_cloud_transfer")
+                    last_command_result = "Point cloud transfer ends. Heartbeat checking is resumed. "
+                    self.restart_check_heartbeat()
                     
                 elif choice == "5":
                     # self.unsubscribe(self.DATA_TOPISCS["point_cloud"])
-                    self.publish(self.COMMAND, "end_point_cloud_transfer")
-                    last_command_result = "Image transfer starts."
+                    self.publish(self.COMMAND, "start_image_transfer")
+                    last_command_result = "Image transfer starts. Heartbeat checking is paused temporarily. "
+                    self.stop_check_heartbeat()
                     
                 elif choice == "6":
                     # self.unsubscribe(self.DATA_TOPISCS["image"])
                     self.publish(self.COMMAND, "end_image_transfer")
-                    last_command_result = "Point cloud transfer ends. "
+                    last_command_result = "Image transfer ends. Heartbeat checking is resumed. "
+                    self.restart_check_heartbeat()
                     
                 else:
                     last_command_result = "Invalid choice. Please try again."
              
                 if self.status == 0:
                     last_command_result = "Detected the device failed to connect to MQTT broker. Please check the device. "
+                    self.stop_check_heartbeat()
                     
                 print(last_command_result)
                 
