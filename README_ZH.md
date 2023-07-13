@@ -4,16 +4,72 @@
 
 ## 架构图
 ![Alt text](<architecture.png>)
+
+
+## Getting Started
+
+该项目由三个主要部分组成：物联网设备、云平台和本地主机。程序分别在本地主机和设备上运行。
+
+### Prerequisites
+
+安装软件前需要准备的东西。
+
+* 具有ROS和其他捕捉功能的设备。
+* 具有公网IP的可靠云服务器。选择哪种云并不重要（如AWS EC2、阿里云ECS或腾讯云VM）。请将IP放在设备和服务器的配置类中。
+* 本地主机应安装Linux环境和ROS。
+
+### Installation
+
+
+1. 按照[链接](https://mosquitto.org/download/)，在物联网设备、云和本地主机中正确安装Eclipse Mosquitto，并配置云系统中的防火墙，允许1883端口的入站流量。检查是否绑定到所有可用的网络接口，输入
+   
+```
+$ netstat -an | grep 1883
+tcp        0      0 0.0.0.0:1883            0.0.0.0:*               LISTEN  
+```
+
+## Test and Deploy
+
+### IoT Device
+
+在设备中，确保您已在主节点注册。注册完成后，将device文件夹中的文件克隆到您的物联网设备中，并在终端运行以下命令：
+
+```
+$ python3 vibot_device.py
+```
+
+该命令将启动程序并订阅命令主题，等待来自服务器的命令。它将定期发送心跳来表明设备还活着。
+
+### Server Host
+
+要在您的本地主机上开始工作，请将 host 文件夹中的文件克隆到您的主机上，然后在终端上运行以下命令：
+
+```
+$ python3 device_commander.py
+```
+
+该命令将检查设备是否存活。如果设备存活，您可以启用VIO算法并与物联网设备进行交互。
+
+请注意，我们为一次传输的点云数据设置了上限，如果您需要传输更多的点云数据，您可以再次传输数据。您也可以根据需要修改上限。由于图像数据太大，无法在单个数据包中传输，因此我们将其分成多个数据包进行传输。您可以在数据处理器中合并这些数据包。
+
+## 项目状态
+
+本项目开放扩展。一些建议
+
+
+* **数据处理器**： 如果您需要处理额外的数据，如保存、可视化或预处理，您可以根据需要修改数据处理器。
+
+* **安全性**： 为了提高安全性，您可以设置身份验证和授权机制，以限制对 "status_check "和 "status_ok "消息的访问。您还可以实施TLS协议，并根据需要设置用户名和密码。
+
+* **其他数据类型**： 如果您需要传输其他数据类型，如焦点长度和位置，您可以通过添加类似的转发器、MQTT主题和不同实现的数据处理器来扩展该项目。
+
+
 ## 需要注意的点
 
-1. 有时候Device有一个bug: Unable to register with master node. 好像无法通过kill杀进程重启roscore，只能reboot。但是有时候单次reboot也不行，只能多reboot几次，似乎这个ROS不如预期的稳定
-2. 程序的安全性还需要加强。 Adversaries可以监听他们之间的通讯，甚至impersonate主机来获取设备所捕捉的数据，这是很危险的。
-3. 极罕见情况，设备能够连接上网却无法正常push heartbeat，重启一下就好了。
- 
-Based on the code you provided, it seems that the image transfer and point cloud transfer are running in the main thread, which means that they will block the main thread until they finish. In general, it is a good practice to run long-running tasks, such as network I/O and file I/O, in a separate thread or process so that they do not block the main thread and cause the program to become unresponsive.
+1. 设备有时出现错误： 无法在主节点注册。似乎不能通过杀死进程来重启roscore，只能重启，但有时重启一次不起作用，只能多重启几次，这个ROS没有想象中的稳定。
+2. 程序的安全性需要注意
+3. 极个别情况下，设备可以连接到互联网，但不能正常推送心跳，重启后就好了。
 
-Therefore, it might be a good idea to start the image transfer and point cloud transfer in separate threads. You can use the threading module in Python to create threads. Here's an example of how you can start the image transfer and point cloud transfer in separate threads:
 
-# Yes, there are more advanced systems that can be used to stop the data transfer in a more graceful and efficient way. Here are some examples:
 
-# 应该用这个 Use a dedicated command topic: Instead of waiting for user input on the terminal, you can create a dedicated MQTT topic for sending control commands to the IoT device. The device can listen to this topic and stop the data transfer when it receives a stop command. This approach allows the user to stop the data transfer from any device that has access to the MQTT broker, not just the device running the program.
+
