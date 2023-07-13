@@ -72,7 +72,7 @@ class Bridge:
                 
                 # Print some suggestions for potential soluations
                 print("---\nSuggestions: ")
-                print("1. Check the WIFI connection. MQTT return code(rc) currently is {self.rc}. ")
+                print(f"1. Check the WIFI connection. MQTT return code(rc) currently is {self.rc}.")
                 print("2. Check the MQTT version in the cloud. You might encounter local loopback monitoring issue in mosquitto 2 and higher. (I encountered it in Aliyun). "
                       +"\nYou may have to downgrade MQTT to 1.6 stable or configure mosquitto.conf as appropriate.")
                 print("3. Wait for a while, or rerun the program. \n")

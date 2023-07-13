@@ -33,15 +33,12 @@ class Vibot(Bridge):
         self.response_topic = "/iot_device/command_response"
         self.enable_vio_algorithm_url = 'http://localhost:8000/Smart/algorithmEnable'
         self.disable_vio_algorithm_url = 'http://localhost:8000/Smart/algorithmDisable'
+        
         # instantiate two bridges for point clouds and images
-        self.pc_bridge = PointCloudForwarder(
-            mqtt_topic="/data/point_cloud", num_point_clouds=5000,
-            host="43.133.159.102", port=1883, qos=2
-            )
-        self.img_bridge = ImageForwarder(
-            mqtt_topic="/data/img", 
-            host="43.133.159.102", port=1883, qos=2
-            )
+        # for point cloud, the upper limit transfer one time is 5000
+        self.pc_bridge = None
+        # for image transfer, one time one image
+        self.img_bridge = None
 
         # Initialize the ROS forwarder node, which can
         # 1. Subscribe to a topic in ROS. 
@@ -113,7 +110,7 @@ class Vibot(Bridge):
             if response.status_code == 200:
                 self.logger.info('Vio algorithm disabled\n')
             else:
-                self.logger.info('Failed to enable vio algorithm, please disable it manually\n')
+                self.logger.info('Failed to disable vio algorithm, please disable it manually\n')
             
             message = {'type': 'disable_vio', 'code': response.status_code}
             json_message = json.dumps(message)
@@ -128,27 +125,44 @@ class Vibot(Bridge):
             self.publish(self.response_topic, json_message)
             self.logger.info("A message sent to iot_device/command_response indicating the point cloud transfer starts")
             
+            # for point cloud, the upper limit transfer one time is 500. 
+            # TODO: You may edit this parameter as appropriate
+            self.pc_bridge = PointCloudForwarder(
+                mqtt_topic="/data/point_cloud", num_point_clouds=500,
+                host="43.133.159.102", port=1883, qos=2
+            )
+            
             self.pc_bridge.start_forwarding()
             
         elif msg == "end_point_cloud_transfer":
             
+            if self.pc_bridge is not None:
+                self.pc_bridge.stop_forwarding()
+                self.pc_bridge.hook()
+                self.pc_bridge = None
+                
+            self.logger.info("A message sent to iot_device/command_response indicating the point cloud transfer ends")
             message = {'type': 'end_pc', 'code': 200}
             json_message = json.dumps(message)
             self.publish(self.response_topic, message=json_message)
-            self.logger.info("A message sent to iot_device/command_response indicating the point cloud transfer ends")
-            
-            self.pc_bridge.stop_forwarding()
             
         elif msg == "start_image_transfer":
             # Every time it just have to forward a certain amount of image message, like one image. 
-            # You may 
+            
+            # for image transfer, one time one image
+            self.img_bridge = ImageForwarder(
+                mqtt_topic="/data/img", 
+                host="43.133.159.102", port=1883, qos=2
+            )
             
             message = {'type': 'start_img', 'code': 200, 'topic': 'test_topic'}
             json_message = json.dumps(message)
             self.publish(self.response_topic, message=json_message)
             
             self.img_bridge.start_forwarding(100)
+            time.sleep(30)
             self.img_bridge.stop_forwarding()
+            
             
             message = {'type': 'end_img', 'code': 200, 'topic': 'test_topic'}
             json_message = json.dumps(message)

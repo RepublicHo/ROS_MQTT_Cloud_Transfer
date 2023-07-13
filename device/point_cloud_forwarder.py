@@ -58,7 +58,7 @@ class PointCloudForwarder(Bridge):
     def pc_callback(self, data):
         if self.is_forwarding:
             try:
-                time.sleep(0.1)
+                time.sleep(0.01)
                 # 1. Convert the PointCloud message to a list of points.
                 point_array = np.array([(p.x, p.y, p.z) for p in data.points])
                 cloud_points = point_array.tolist()
@@ -99,6 +99,7 @@ class PointCloudForwarder(Bridge):
 
     def start_forwarding(self):
         # Subscribe to the ROS topic
+        
         self.sub = rospy.Subscriber("/PR_BE/point_cloud", PointCloud, self.pc_callback)
         self.is_forwarding = True
         

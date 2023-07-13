@@ -2,8 +2,6 @@ import paho.mqtt.client as mqtt
 import numpy as np
 import time
 import sys
-import queue
-import datetime
 from message_processor import ImageProcessor, PointCloudProcessor
 from sensor_msgs.msg import Image
 import rospy
@@ -15,10 +13,6 @@ import config as CONFIG
 import iot_status_checker as isc
 
 from bridge import Bridge
-
-# Yes, there are more advanced systems that can be used to stop the data transfer in a more graceful and efficient way. Here are some examples:
-
-# 应该用这个 Use a dedicated command topic: Instead of waiting for user input on the terminal, you can create a dedicated MQTT topic for sending control commands to the IoT device. The device can listen to this topic and stop the data transfer when it receives a stop command. This approach allows the user to stop the data transfer from any device that has access to the MQTT broker, not just the device running the program.
 
 
 class DeviceCommander(Bridge):
@@ -83,7 +77,6 @@ class DeviceCommander(Bridge):
         self.vio_enabled = False
         
         # TODO: Not yet used. 
-        self.user_input_queue = queue.Queue()
         self.status = 0 # 0 for not connected, 1 for connected, 2 for timeout or other bugs
         
         
@@ -135,7 +128,7 @@ class DeviceCommander(Bridge):
         if msg.topic == self.DEVICE_HEARTBEAT:
             self.last_heartbeat_time = time.time()
             # test code: print message when it hearts the heartbeat. 
-            self.logger.info(f"Heartbeat received, updated last_heartbeat: {self.last_heartbeat_time}")
+            # self.logger.info(f"Heartbeat received, updated last_heartbeat: {self.last_heartbeat_time}")
                
         elif msg.topic == self.DATA_TOPISCS["point_cloud"]:
             # point cloud message will be handled by point cloud processor instance 
@@ -146,7 +139,7 @@ class DeviceCommander(Bridge):
             pass
             
         elif msg.topic == self.COMMAND_RESPONSE:  
-            self.logger.info("Command response received!!!!!")
+            # self.logger.info("Command response received!!!!!")
             self.msg_process(msg)
         
         else: # If message is from an unknown topic, it serves as a reminder. 
@@ -184,6 +177,7 @@ class DeviceCommander(Bridge):
             elif json_msg['type'] == "end_pc" and json_msg['code'] == 200:
                 self.logger.info("Device responses that it will be ending point cloud transfer")
                 self.pc_topic = None
+                # self.pc_processor.stop_processing()
                 
             elif json_msg['type'] == "start_img" and json_msg['code'] == 200:
                 self.logger.info("Device responses that it will be starting image transfer")
@@ -349,25 +343,28 @@ class DeviceCommander(Bridge):
                 elif choice == "3":
                     # self.subscribe(self.DATA_TOPISCS["point_cloud"])
                     self.publish(self.COMMAND, "start_point_cloud_transfer")
-                    print("Point cloud transfer starts. Heartbeat checking is paused temporarily. ")
-                    self.stop_check_heartbeat()
+                    print("Point cloud transfer starts. ")
+                    # self.stop_check_heartbeat()
                     last_command_result = self.wait_for_pc_topic()
                     
                 elif choice == "4":
                     # self.subscribe(self.DATA_TOPISCS["image"])
                     self.publish(self.COMMAND, "end_point_cloud_transfer")
-                    print("Point cloud transfer ends. Heartbeat checking is resumed. ")
-                    self.restart_check_heartbeat()
+                    print("Point cloud transfer ends. ")
+                    # self.restart_check_heartbeat()
+                    time.sleep(1)
                     last_command_result = self.end_pc_transfer()
                     
                 elif choice == "5":
                     # self.unsubscribe(self.DATA_TOPISCS["point_cloud"])
                     self.publish(self.COMMAND, "start_image_transfer")
-                    print("Image transfer starts. Heartbeat checking is paused temporarily. ")
+                    print("Image transfer starts. ")
                     self.stop_check_heartbeat()
                     last_command_result = self.wait_for_img_topic()
                     self.restart_check_heartbeat()
-                    
+                    print(last_command_result)
+                    last_command_result = self.end_img_transfer()
+                    time.sleep(1) 
                 else:
                     last_command_result = "Invalid choice. Please try again."
              
@@ -376,6 +373,7 @@ class DeviceCommander(Bridge):
                     self.stop_check_heartbeat()
                     
                 print(last_command_result)
+                time.sleep(0.1)
                 
         
         self.client.loop_stop()
@@ -388,7 +386,6 @@ def main():
     # rospy.init_node('device_commander', anonymous=True)
     
     commander_bridge = DeviceCommander(host=CONFIG.CONNECTION.BROKER, port=1883, qos=2)
-    
     commander_bridge.menu()
 
 if __name__ == '__main__':

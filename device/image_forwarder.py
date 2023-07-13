@@ -2,6 +2,7 @@ import logging
 import rospy
 from sensor_msgs.msg import Image
 from bridge import Bridge
+import time
 
 class ImageForwarder(Bridge):
     # Define class constants for magic numbers
@@ -55,6 +56,7 @@ class ImageForwarder(Bridge):
     def image_callback(self, msg):
         if self.is_forwarding:
             try:
+                
                 # 1. Convert the ROS message to a bytearray
                 byte_array = bytearray(msg.data)
 
@@ -66,7 +68,7 @@ class ImageForwarder(Bridge):
                     end = (i + 1) * self.packet_size
                     packet = byte_array[start:end]
                     self.publish(self.mqtt_topic, message=packet)
-
+                    time.sleep(0.01)
                     self.logger.info(
                         "Forwarded packet {} of {} with payload size {}".format(
                             self.num_packets_forwarded + i + 1, num_packets, len(packet)
