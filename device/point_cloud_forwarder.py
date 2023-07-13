@@ -102,6 +102,7 @@ class PointCloudForwarder(Bridge):
         
         self.sub = rospy.Subscriber("/PR_BE/point_cloud", PointCloud, self.pc_callback)
         self.is_forwarding = True
+        self.num_point_clouds_forwarded = 0
         
     def stop_forwarding(self):
         self.is_forwarding = False
