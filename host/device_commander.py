@@ -111,9 +111,7 @@ class DeviceCommander(Bridge):
         
     def check_heartbeat(self):
         """Checks if the device has received a heartbeat message from the cloud within the specified timeout.
-
         If the last heartbeat time is older than the heartbeat timeout duration, sets the status to 0 (timeout).
-
         To stop this function, set the status to a value other than 1.
         """
         while self.status == 1:
@@ -129,7 +127,7 @@ class DeviceCommander(Bridge):
             time.sleep(1)
             
         self.logger.info("Heartbeat check stopped")
-        self.hook()    
+        self.hook() # Gracefully terminate the program.   
  
     # Define the function to handle incoming messages
     def on_message(self, client, userdata, msg):   
@@ -137,7 +135,7 @@ class DeviceCommander(Bridge):
         if msg.topic == self.DEVICE_HEARTBEAT:
             self.last_heartbeat_time = time.time()
             # test code: print message when it hearts the heartbeat. 
-            self.logger.info("Heartbeat received, updated last_heartbeat: {self.last_heartbeat_time}")
+            self.logger.info(f"Heartbeat received, updated last_heartbeat: {self.last_heartbeat_time}")
                
         elif msg.topic == self.DATA_TOPISCS["point_cloud"]:
             # point cloud message will be handled by point cloud processor instance 
@@ -185,15 +183,16 @@ class DeviceCommander(Bridge):
             
             elif json_msg['type'] == "end_pc" and json_msg['code'] == 200:
                 self.logger.info("Device responses that it will be ending point cloud transfer")
+                self.pc_topic = None
                 
-            elif json_msg['type'] == "end_img" and json_msg['code'] == 200:
+            elif json_msg['type'] == "start_img" and json_msg['code'] == 200:
                 self.logger.info("Device responses that it will be starting image transfer")
                 self.img_topic = json_msg['topic']
                 # self.image_processor.start_processing()
-
                 
             elif json_msg['type'] == "end_img" and json_msg['code'] == 200:
                 self.logger.info("Device responses that it will be ending image transfer")
+                self.img_topic = None
                 # self.image_processor.stop_processing()
             
             else:

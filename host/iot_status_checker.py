@@ -122,8 +122,8 @@ class StatusChecker(Bridge):
         else:
             self.client.loop_stop()
             print(":( Please be advised that the vibot may fail to connect to the Internet.")
-            print("1. Try to reboot the Vibot and check its network. ")
-            print("2. Try to reboot this program. ")
+            print("1. Try to rerun the Vibot and check its network. ")
+            print("2. Try to rerun this program. ")
             return 0
                 
         

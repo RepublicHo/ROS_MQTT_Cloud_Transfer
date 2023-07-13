@@ -31,12 +31,11 @@ class Vibot(Bridge):
         self.status_check_topic = "/iot_device/status_check"
         self.command_topic = mqtt_topic
         self.response_topic = "/iot_device/command_response"
-        
         self.enable_vio_algorithm_url = 'http://localhost:8000/Smart/algorithmEnable'
-        
+        self.disable_vio_algorithm_url = 'http://localhost:8000/Smart/algorithmDisable'
         # instantiate two bridges for point clouds and images
         self.pc_bridge = PointCloudForwarder(
-            mqtt_topic="/data/point_cloud", num_point_clouds=100,
+            mqtt_topic="/data/point_cloud", num_point_clouds=5000,
             host="43.133.159.102", port=1883, qos=2
             )
         self.img_bridge = ImageForwarder(
@@ -109,8 +108,7 @@ class Vibot(Bridge):
         
         elif msg == "disable_vio_service":
             
-            url = 'http://localhost:8000/Smart/algorithmDisable'
-            response = requests.put(url)
+            response = requests.put(self.disable_vio_algorithm_url)
 
             if response.status_code == 200:
                 self.logger.info('Vio algorithm disabled\n')
@@ -123,10 +121,12 @@ class Vibot(Bridge):
                         
         elif msg == "start_point_cloud_transfer":
             
+            # TODO: for security concerns, every time the topic may be randomly
+            # generated, instead of a fixed one. 
             message = {'type': 'start_pc', 'code': 200, 'topic': 'test_topic'}
             json_message = json.dumps(message)
             self.publish(self.response_topic, json_message)
-            self.logger.info("--log--: sent to iot_device/command_response indicating we are starting the point cloud transfer")
+            self.logger.info("A message sent to iot_device/command_response indicating the point cloud transfer starts")
             
             self.pc_bridge.start_forwarding()
             
@@ -135,21 +135,28 @@ class Vibot(Bridge):
             message = {'type': 'end_pc', 'code': 200}
             json_message = json.dumps(message)
             self.publish(self.response_topic, message=json_message)
-            self.logger.info("--log--: sent to iot_device/command_response indicating we are ending the point cloud transfer")
+            self.logger.info("A message sent to iot_device/command_response indicating the point cloud transfer ends")
             
             self.pc_bridge.stop_forwarding()
             
         elif msg == "start_image_transfer":
+            # Every time it just have to forward a certain amount of image message, like one image. 
+            # You may 
             
-            # message = {'type': 'start_img', 'code': 200, 'topic': 'test_topic'}
-            # json_message = json.dumps(message)
-            # self.publish(self.response_topic, message=json_message)
+            message = {'type': 'start_img', 'code': 200, 'topic': 'test_topic'}
+            json_message = json.dumps(message)
+            self.publish(self.response_topic, message=json_message)
             
             self.img_bridge.start_forwarding(100)
             self.img_bridge.stop_forwarding()
             
+            message = {'type': 'end_img', 'code': 200, 'topic': 'test_topic'}
+            json_message = json.dumps(message)
+            self.publish(self.response_topic, message=json_message)
+            
         else:
             self.logger.warning(f"Vibot received unknown message: {msg}")
+            self.logger.warning("This could be a threat!")
             pass
     
                 
@@ -184,7 +191,6 @@ if __name__ == "__main__":
         sn = Vibot()
         sn.client.loop_forever()
     except rospy.ROSInterruptException:
-        
         pass
 
     
