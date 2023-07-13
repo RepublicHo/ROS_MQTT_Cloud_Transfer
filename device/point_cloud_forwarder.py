@@ -12,7 +12,7 @@ class PointCloudForwarder(Bridge):
     # Define class constants for magic numbers
     DEFAULT_QOS = 0
     DEFAULT_KEEPALIVE = 60
-    DEFAULT_EXIT_ON_COMPLETE = True
+    DEFAULT_EXIT_ON_COMPLETE = False
     DEFAULT_ENABLE_LOGGING = True
     
     def __init__(

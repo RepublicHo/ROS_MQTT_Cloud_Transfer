@@ -10,8 +10,6 @@ class StatusChecker(Bridge):
                  user_id="", password="", 
                  host="localhost", port=1883, keepalive=60, qos=0): 
         
-        
-        
         # status check is composed of heartbeat check and response check. 
         # status_code is used for checking if the host can connect to the device through
         # 1. the host can sense the heartbeat of the device. 
@@ -137,7 +135,7 @@ def main():
     
     # print(f"attempt {attempt}\n---")
     
-    cli = StatusChecker(client_id = "status_checker", host="43.133.159.102", port=1883)
+    cli = StatusChecker(client_id = "status_checker", host=CONFIG.MQTT_BROKER.IP_ADDRESS, port=1883)
     print(cli.get_device_status())
         
     # except Exception as e:

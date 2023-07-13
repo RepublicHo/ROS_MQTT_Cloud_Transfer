@@ -170,34 +170,35 @@ class DeviceCommander(Bridge):
                 self.vio_enabled = False
                 
             elif json_msg['type'] == "start_pc" and json_msg['code'] == 200:
-                self.logger.info("Device responses that it will be starting point cloud transfer")
+                # self.logger.info("Device responses that it will be starting point cloud transfer")
                 self.pc_topic = json_msg['topic']
-                # self.pc_processor.start_processing()
+                self.pc_processor.start_processing()
             
             elif json_msg['type'] == "end_pc" and json_msg['code'] == 200:
-                self.logger.info("Device responses that it will be ending point cloud transfer")
+                # self.logger.info("Device responses that it will be ending point cloud transfer")
                 self.pc_topic = None
-                # self.pc_processor.stop_processing()
+                self.pc_processor.stop_processing()
                 
             elif json_msg['type'] == "start_img" and json_msg['code'] == 200:
-                self.logger.info("Device responses that it will be starting image transfer")
+                # self.logger.info("Device responses that it will be starting image transfer")
                 self.img_topic = json_msg['topic']
-                # self.image_processor.start_processing()
+                self.image_processor.start_processing()
                 
             elif json_msg['type'] == "end_img" and json_msg['code'] == 200:
-                self.logger.info("Device responses that it will be ending image transfer")
+                # self.logger.info("Device responses that it will be ending image transfer")
                 self.img_topic = None
-                # self.image_processor.stop_processing()
+                self.image_processor.stop_processing()
             
             else:
                 self.logger.warning(f"A JSON message {json_msg['type']} with code {json_msg['code']} is received unexpectedly!")
         
         else:
             self.logger.warning("An invalid JSON message is received! Please check!")
+            self.logger.warning("This could be a threat!")
     
     def check_device_power_status(self):
         
-        status_checker = isc.StatusChecker(client_id = "status_checker", host="43.133.159.102", port=1883)
+        status_checker = isc.StatusChecker(client_id = "status_checker", host=CONFIG.MQTT_BROKER.IP_ADDRESS, port=1883)
         
         status = status_checker.get_device_status()
         print("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")
@@ -365,6 +366,7 @@ class DeviceCommander(Bridge):
                     print(last_command_result)
                     last_command_result = self.end_img_transfer()
                     time.sleep(1) 
+                    
                 else:
                     last_command_result = "Invalid choice. Please try again."
              

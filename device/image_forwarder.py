@@ -9,7 +9,7 @@ class ImageForwarder(Bridge):
     DEFAULT_PACKET_SIZE = 1024
     DEFAULT_QOS = 0
     DEFAULT_KEEPALIVE = 60
-    DEFAULT_EXIT_ON_COMPLETE = True
+    DEFAULT_EXIT_ON_COMPLETE = False
     DEFAULT_ENABLE_LOGGING = True
 
     def __init__(
@@ -85,6 +85,7 @@ class ImageForwarder(Bridge):
                     # Unsubscribe from the ROS topic
                     self.sub.unregister()
                     rospy.loginfo("Forwarded {} packets, unsubscribing from topic".format(self.num_packets))
+                    
                     if self.exit_on_complete:
                         rospy.signal_shutdown("Image forwarding complete")
 
@@ -94,7 +95,7 @@ class ImageForwarder(Bridge):
     def start_forwarding(self, num_packets):
         # Set the desired number of packets to forward
         self.num_packets = num_packets
-        
+        self.num_packets_forwarded = 0
         # Subscribe to the ROS topic
         self.sub = rospy.Subscriber("/PR_FE/feature_img", Image, self.image_callback)
         self.is_forwarding = True

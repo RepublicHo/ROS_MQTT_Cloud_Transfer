@@ -11,6 +11,7 @@ from bridge import Bridge
 from point_cloud_forwarder import PointCloudForwarder
 from image_forwarder import ImageForwarder
 import logging
+import config as CONFIG
 
 class Vibot(Bridge):
     # Define class constant 
@@ -22,7 +23,7 @@ class Vibot(Bridge):
         client_id="vibot_device", 
         user_id="", 
         password="", 
-        host="43.133.159.102", 
+        host=CONFIG.MQTT_BROKER.IP_ADDRESS, 
         port=1883, 
         keepalive=60, 
         qos=0
@@ -37,13 +38,13 @@ class Vibot(Bridge):
         # instantiate two bridges for point clouds and images
         # for point cloud, the upper limit transfer one time is 5000
         self.pc_bridge = PointCloudForwarder(
-            mqtt_topic="/data/point_cloud", num_point_clouds=5000,
-            host="43.133.159.102", port=1883, qos=2
+            mqtt_topic="/data/point_cloud", num_point_clouds=50,
+            host=CONFIG.MQTT_BROKER.IP_ADDRESS, port=1883, qos=2
         )
         # for image transfer, one time one image
         self.img_bridge = ImageForwarder(
             mqtt_topic="/data/img", 
-            host="43.133.159.102", port=1883, qos=2
+            host=CONFIG.MQTT_BROKER.IP_ADDRESS, port=1883, qos=2
         )
 
         # Initialize the ROS forwarder node, which can
@@ -131,7 +132,10 @@ class Vibot(Bridge):
             self.publish(self.response_topic, json_message)
             self.logger.info("A message sent to iot_device/command_response indicating the point cloud transfer starts")
             
-            self.pc_bridge.start_forwarding()
+            try:
+                self.pc_bridge.start_forwarding()
+            except Exception as e:
+                self.logger.error(e)
             
         elif msg == "end_point_cloud_transfer":
             
@@ -140,7 +144,10 @@ class Vibot(Bridge):
             self.publish(self.response_topic, message=json_message)
             self.logger.info("A message sent to iot_device/command_response indicating the point cloud transfer ends")
             
-            self.pc_bridge.stop_forwarding()
+            try:
+                self.pc_bridge.stop_forwarding()
+            except Exception as e:
+                self.logger.error(e)
             
         elif msg == "start_image_transfer":
             # Every time it just have to forward a certain amount of image message, like one image. 
@@ -150,9 +157,12 @@ class Vibot(Bridge):
             json_message = json.dumps(message)
             self.publish(self.response_topic, message=json_message)
             
-            self.img_bridge.start_forwarding(100)
-            time.sleep(30)
-            self.img_bridge.stop_forwarding()
+            try:
+                self.img_bridge.start_forwarding(100)
+                time.sleep(10)
+                self.img_bridge.stop_forwarding()
+            except Exception as e:
+                self.logger.error(e)
             
             message = {'type': 'end_img', 'code': 200, 'topic': 'test_topic'}
             json_message = json.dumps(message)
@@ -196,6 +206,3 @@ if __name__ == "__main__":
         sn.client.loop_forever()
     except rospy.ROSInterruptException:
         pass
-
-    
-

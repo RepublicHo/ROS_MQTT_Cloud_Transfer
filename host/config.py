@@ -9,14 +9,6 @@ class APP:
     VERSION = "V1.0"
 
 class CONNECTION:
-    # Aliyun by Zhe
-    BROKER = "43.133.159.102"
-    PORT = 1883
-    TOPIC1 = ""
-    TOPIC2 = ""
 
-class DEVICE:
-    
-    IP = "192.168.1.73" #
-    HTTP_PORT = "8000"
-    
+    BROKER = "ENTER YOUR CLOUD ADDRESS"
+    PORT = 1883
